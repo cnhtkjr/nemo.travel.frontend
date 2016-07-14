@@ -54,7 +54,22 @@ define(
 							ILS: '₪',
 							PLN: 'zł',
 							RUB: 'руб',
-							BYR: 'p.'
+							BYR: 'p.',
+							AZN: '&#8380;'
+						},
+
+						/**
+						 * The format of these currencies is static
+						 * @var {Object}
+						 */
+						currencyFixedFormat: {
+							EUR: '0,0.00 $',
+							USD: '0,0.00 $',
+							GBP: '0,0.00 $',
+							AZN: '0,0.00 $',
+							BYR: '0,0 $',
+							KZT: '0,0 $',
+							UZS: '0,0 $'
 						},
 
 						/**
@@ -139,6 +154,8 @@ define(
 						processElement($(e.target), currentCurrency);
 					})
 					.on('cc:changeCurrency',function (e, eventData) {
+						console.log(eventData);
+
 						currentCurrency = null;
 
 						if (typeof eventData != 'undefined' && typeof eventData.currency != 'undefined') {
@@ -181,14 +198,28 @@ define(
 				function processElement ($element, currency) {
 					var amount = parseFloat($element.attr('amount'), 10),
 						originalCurrency = $element.attr('currency'),
+						forceCurrency = $element.attr('force-currency'),
 						currencyClass = $element.attr('currency-class'),
-						format = $element.attr('format') || options.defaultFormat,
+						format = $.trim($element.attr('format')) || options.defaultFormat,
 						roundingFunction = options.roundingFunction,
 						eltRoundType = $element.attr('round'),
 						result;
 
 					if (originalCurrency == null) {
 						return;
+					}
+					
+					if (typeof forceCurrency != "undefined") {
+						currency = forceCurrency;
+					}
+
+					if( currency in options.currencyFixedFormat && format != '$' ) {
+						format = options.currencyFixedFormat[currency]; //
+					}
+
+					// Dynamic conversion
+					if(currency && originalCurrency && currency !== originalCurrency){
+						eltRoundType = 'normal';
 					}
 
 					originalCurrency = originalCurrency.toUpperCase();
@@ -201,7 +232,7 @@ define(
 					}
 
 					// If we have no currency or there's a no-translation flag - currency remains as set in tag
-					if (typeof currency == "undefined" || currency == null || typeof $element.attr('no-translate') != "undefined") {
+					if (typeof currency == "undefined" || currency == null) {
 						currency = originalCurrency;
 						log('No translation set! Currency is set to', currency);
 					}
@@ -302,6 +333,6 @@ define(
 					}
 				}
 			}
-		})(jQuery);
+		})($);
 	}
 );

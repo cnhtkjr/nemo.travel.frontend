@@ -19,6 +19,7 @@ define(
 			this.passengersError = ko.observable(false);
 			this.passengersUseExtendedSelect = true;
 			this.passengersFastSelectOptions = [];
+			this.passengersSelectAlt = false;
 
 			this.options = {};
 			this.carriersLoaded = ko.observable(this.carriers !== null);
@@ -34,6 +35,7 @@ define(
 			this.directFlights = ko.observable(false);
 			this.vicinityDates = ko.observable(false);
 			this.serviceClass = ko.observable(this.serviceClasses[0]);
+			this.flightNumbers = ko.observableArray([]);
 
 			this.validaTERROR = ko.observable(false);
 
@@ -48,7 +50,8 @@ define(
 				serviceClass: this.serviceClass(),
 				direct: this.directFlights(),
 				vicinityDates: this.vicinityDates(),
-				immediateSearch: false
+				immediateSearch: false,
+				flightNumbers: null
 			};
 
 			// Search process type - popupped or immediate transition to results
@@ -65,6 +68,8 @@ define(
 			this.initialParams = '';
 			this.useAdditionalOptions = true;
 			this.forceSelfHostNavigation = false;
+			this.addLanguageToResultsURL = false;
+			this.forceLocationChange = false;
 			this.forceChangeToSearch = false;
 			this.forceInitialTripType = false;
 
@@ -170,6 +175,7 @@ define(
 					passengers = this.passengers(),
 					adtSum = 0,
 					infSum = 0,
+					insSum = 0,
 					total = 0;
 
 				for (var i in passengers) {
@@ -182,8 +188,12 @@ define(
 							adtSum += passengers[i]();
 						}
 
-						if (this.passengerInfantTypes.indexOf(i) >= 0) {
+						if (i == 'INF') {
 							infSum += passengers[i]();
+						}
+
+						if (i == 'INS'){
+							insSum += passengers[i]();
 						}
 					}
 				}
@@ -195,12 +205,15 @@ define(
 					}
 				}
 
-				// ADT+YTH+SRC >= INF+INS
-				// Infants: not more than adtSum
-				for (var i = 0; i < this.passengerInfantTypes.length; i++) {
-					if (ret.hasOwnProperty(this.passengerInfantTypes[i])) {
-						ret[this.passengerInfantTypes[i]].max = Math.min(adtSum, ret[this.passengerInfantTypes[i]].max);
-					}
+				// ADT+YTH+SRC >= INF
+				// Infants without seat: not more than adtSum
+				if (ret.hasOwnProperty('INF')) {
+					ret['INF'].max = Math.min(adtSum, ret['INF'].max);
+				}
+
+				// Infants with seat only if at least 1 adult
+				if (ret.hasOwnProperty('INS') && adtSum == 0){
+					ret['INS'].max = 0;
 				}
 
 				// Adults: not less than infSum
@@ -208,7 +221,7 @@ define(
 					if (ret.hasOwnProperty(this.passengerAdultTypes[i])) {
 						ret[this.passengerAdultTypes[i]].min = Math.max(
 							0,
-							passengers[this.passengerAdultTypes[i]]() - adtSum + infSum,
+							passengers[this.passengerAdultTypes[i]]() - adtSum +  Math.max(infSum, insSum > 0 ? 1 : 0),
 							ret[this.passengerAdultTypes[i]].min
 						);
 					}
@@ -240,7 +253,7 @@ define(
 					ret = false;
 					this.passengersError('noPassengers');
 				}
-				else if (adtPassengers == 0) {
+				else if (adtPassengers == 0 && !this.searchWithoutAdults) {
 					ret = false;
 					this.passengersError('noAdults');
 				}
@@ -299,7 +312,7 @@ define(
 				for (var i = 0; i < segments.length; i++) {
 					ret.segments.push(
 						[
-							segments[i].items.departure.value() ? segments[i].items.departure.value().countryz : null,
+							segments[i].items.departure.value() ? segments[i].items.departure.value().IATA : null,
 							segments[i].items.arrival.value() ? segments[i].items.arrival.value().IATA : null,
 							segments[i].items.departureDate.value() ? segments[i].items.departureDate.value().getISODate() : null,
 							segments[i].items.departure.value() ? segments[i].items.departure.value().isCity : null,
@@ -348,7 +361,7 @@ define(
 						(segments[0].items.departure.value() ? (segments[0].items.departure.value().isCity ? 'c' : 'a') + segments[0].items.departure.value().IATA : '###') +
 						(segments[0].items.arrival.value() ? (segments[0].items.arrival.value().isCity ? 'c' : 'a') + segments[0].items.arrival.value().IATA : '###') +
 						(segments[0].items.departureDate.value() ? segments[0].items.departureDate.value().dropTime().getISODate().replace(/-/g, '') : '########') +
-						(segments[1].items.departureDate.value() ? segments[1].items.departureDate.value().dropTime().getISODate().replace(/-/g, '') : '########');
+						(segments[1] && segments[1].items.departureDate.value() ? segments[1].items.departureDate.value().dropTime().getISODate().replace(/-/g, '') : '########');
 				}
 				else {
 					for (var i = 0; i < segments.length; i++) {
@@ -366,6 +379,10 @@ define(
 				}
 
 				urlAdder += '-class=' + this.serviceClass();
+				
+				if( this.flightNumbers().length ){
+					urlAdder += '-flightNumbers=' + this.flightNumbers();
+				}
 
 				if (this.directFlights()) {
 					urlAdder += '-direct';
@@ -477,7 +494,7 @@ define(
 		// Additional stuff
 		// RegExps for params parsing
 		FlightsSearchFormController.prototype.paramsParsers = {
-			segs: /([A-Z]{3})([A-Z]{3})(\d{8})/g,
+			segs: /([A-Z]{3})([A-Z]{3})(\d{8}|d\d{1,2})/g,
 			passengers: /([A-Z]{3})(\d+)/g
 		};
 
@@ -497,6 +514,14 @@ define(
 
 				if ('forceSelfHostNavigation' in this.$$componentParameters.additional) {
 					this.forceSelfHostNavigation = !!this.$$componentParameters.additional.forceSelfHostNavigation;
+				}
+				
+				if ('addLanguageToResultsURL' in this.$$componentParameters.additional) {
+					this.addLanguageToResultsURL = !!this.$$componentParameters.additional.addLanguageToResultsURL;
+				}
+
+				if ('forceLocationChange' in this.$$componentParameters.additional) {
+					this.forceLocationChange = !!this.$$componentParameters.additional.forceLocationChange;
 				}
 
 				if ('forceChangeToSearch' in this.$$componentParameters.additional) {
@@ -558,7 +583,18 @@ define(
 					t.shift();
 
 					// Processing date
-					t[2] = t[2].substr(0,4) + '-' + t[2].substr(4,2) + '-' + t[2].substr(6);
+					// Full date
+					if (t[2].length == 8) {
+						t[2] = t[2].substr(0,4) + '-' + t[2].substr(4,2) + '-' + t[2].substr(6);
+					}
+					// Relative date
+					else {
+						var now = new Date();
+
+						now.setDate(now.getDate() + parseInt(t[2].substr(1), 10));
+
+						t[2] = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).substr(-2) + '-' + ('0' + now.getDate()).substr(-2);
+					}
 
 					// If we're preinitted by URL - IATAs mean cities first
 					t.push(true);
@@ -602,8 +638,15 @@ define(
 								this.preinittedData.serviceClass = t;
 							}
 						}
+						
+						// Flight numbers
+						if (this.$$componentParameters.route[2][i].substr(0, 14) == 'flightNumbers=') {
+							this.preinittedData.flightNumbers = this.$$componentParameters.route[2][i].substr(14).split('+');
+						}
 					}
 				}
+
+				console.log(this.preinittedData.segments, this.$$componentParameters.route[0]);
 			}
 			// Preinitted by cookie
 			else if (this.useCookies) {
@@ -629,14 +672,16 @@ define(
 				prevdate = this.options.dateOptions.minDate;
 				nextdate = null;
 
-				for (var j = 0; j < segments.length; j++) {
-					if (j < i && segments[j].items.departureDate.value()) {
-						if (!prevdate || prevdate < segments[j].items.departureDate.value().dateObject()) {
-							prevdate = segments[j].items.departureDate.value().dateObject();
+				if (this.options.dateOptions.incorrectDatesBlock) {
+					for (var j = 0; j < segments.length; j++) {
+						if (j < i && segments[j].items.departureDate.value()) {
+							if (!prevdate || prevdate < segments[j].items.departureDate.value().dateObject()) {
+								prevdate = segments[j].items.departureDate.value().dateObject();
+							}
 						}
-					}
-					else if (j > i && segments[j].items.departureDate.value() && !nextdate) {
-						nextdate = segments[j].items.departureDate.value().dateObject();
+						else if (j > i && segments[j].items.departureDate.value() && !nextdate) {
+							nextdate = segments[j].items.departureDate.value().dateObject();
+						}
 					}
 				}
 
@@ -683,6 +728,24 @@ define(
 			}
 		};
 
+		FlightsSearchFormController.prototype.segmentDateChanged = function (segment) {
+			var segments = this.segments();
+
+			if (
+				segments.length - 1 > segment.index &&
+				segment.items.departureDate.value()
+			) {
+				for (var i = segment.index + 1; i < segments.length; i++) {
+					if (
+						segments[i].items.departureDate.value() &&
+						segments[i].items.departureDate.value().getTimestamp() < segment.items.departureDate.value().getTimestamp()
+					) {
+						segments[i].items.departureDate.value(null);
+					}
+				}
+			}
+		};
+
 		FlightsSearchFormController.prototype.processValidation = function () {
 			var segments;
 
@@ -704,33 +767,25 @@ define(
 		};
 
 		FlightsSearchFormController.prototype.goToResults = function (id) {
-			var urlAdder = this.URLParams();
+			var urlAdder = this.URLParams(),
+				langInURL = this.addLanguageToResultsURL;
 
 			if (
-				this.forceSelfHostNavigation ||
-				this.$$controller.options.dataURL.indexOf('/') === 0 ||
-				this.$$controller.options.dataURL.indexOf(document.location.protocol + '//' + document.location.host) === 0
+				!this.forceLocationChange &&
+				(
+					this.forceSelfHostNavigation ||
+					this.$$controller.options.dataURL.indexOf('/') === 0 ||
+					this.$$controller.options.dataURL.indexOf(document.location.protocol + '//' + document.location.host) === 0
+				)
 			) {
 				this.$$controller.navigate('results/' + (id ? id + '/' : '') + urlAdder, true, 'FlightsResults');
 			}
 			else {
-				document.location = this.$$controller.options.dataURL.split('/').splice(0, 3).join('/') + '/results/' + (id ? id + '/' : '') + urlAdder;
+				document.location = this.$$controller.options.dataURL.split('/').splice(0, 3).join('/') + '/results/' + (id ? id + '/' : '') + urlAdder + (langInURL ? '?changelang=' + this.$$controller.options.i18nLanguage : '');
 			}
 		};
 
 		FlightsSearchFormController.prototype.startSearch = function () {
-			function searchError (message, systemData) {
-				if (typeof systemData != 'undefined' && systemData[0] !== 0) {
-					self.$$controller.error('SEARCH ERROR: '+message, systemData);
-				}
-
-				if (typeof systemData == 'undefined' || systemData[0] !== 0) {
-					self.searchError(self.$$controller.i18n('FlightsSearchForm', 'searchError_' + message));
-				}
-
-				self.isSearching(false);
-			}
-
 			// @CRUTCH ignoring empty segments in CR
 			var segments = this.segments(),
 				emptySegments = [];
@@ -785,87 +840,105 @@ define(
 				this.goToResults();
 			}
 			else {
-				var self = this,
+				this.makeSynchronousSeach();
+			}
+		};
+
+		FlightsSearchFormController.prototype.makeSynchronousSeach = function () {
+			var self = this,
 				passengers = this.passengers(),
 				params = {
-						segments: [],
-						passengers: [],
-						parameters: {
-							direct: this.directFlights(),
-							aroundDates: this.vicinityDates() ? this.options.dateOptions.aroundDatesValues[this.options.dateOptions.aroundDatesValues.length - 1] : 0,
-							serviceClass: this.serviceClass(),
-							airlines: []/*,
-							delayed: this.delayedSearch*/
-						}
-					};
+					segments: [],
+					passengers: [],
+					parameters: {
+						direct: this.directFlights(),
+						aroundDates: this.vicinityDates() ? this.options.dateOptions.aroundDatesValues[this.options.dateOptions.aroundDatesValues.length - 1] : 0,
+						serviceClass: this.serviceClass(),
+						flightNumbers: this.flightNumbers(),
+						airlines: []/*,
+						 delayed: this.delayedSearch*/
+					}
+				},
+				segments = this.segments();
 
-				// Constructing params
-				for (var i = 0; i < segments.length; i++) {
-					params.segments.push({
-						departure: {
-							IATA: segments[i].items.departure.value().IATA,
-							isCity: segments[i].items.departure.value().isCity
-						},
-						arrival: {
-							IATA: segments[i].items.arrival.value().IATA,
-							isCity: segments[i].items.arrival.value().isCity
-						},
-						// @CRUTCH - ignore missing date of second leg on RT
-						departureDate: segments[i].items.departureDate.value() ? segments[i].items.departureDate.value().dropTime().getISODateTime() : null
+			// Constructing params
+			for (var i = 0; i < segments.length; i++) {
+				params.segments.push({
+					departure: {
+						IATA: segments[i].items.departure.value().IATA,
+						isCity: segments[i].items.departure.value().isCity
+					},
+					arrival: {
+						IATA: segments[i].items.arrival.value().IATA,
+						isCity: segments[i].items.arrival.value().isCity
+					},
+					// @CRUTCH - ignore missing date of second leg on RT
+					departureDate: segments[i].items.departureDate.value() ? segments[i].items.departureDate.value().dropTime().getISODateTime() : null
+				});
+			}
+
+			for (var i in passengers) {
+				if (passengers.hasOwnProperty(i)) {
+					params.passengers.push({
+						type: i,
+						count: passengers[i]()
 					});
 				}
+			}
 
-				for (var i in passengers) {
-					if (passengers.hasOwnProperty(i)) {
-						params.passengers.push({
-							type: i,
-							count: passengers[i]()
-						});
-					}
-				}
+			this.$$controller.log('STARTING SEARCH');
+			this.isSearching(true);
 
-				this.$$controller.log('STARTING SEARCH');
-				this.isSearching(true);
+			self.searchError(false);
 
-				self.searchError(false);
+			this.searchRequest(
+				this.$$controller.loadData(
+					'/flights/search/request',
+					{request: JSON.stringify(params)},
+					function (text, request) {
+						var response;
 
-				this.searchRequest(
-					this.$$controller.loadData(
-						'/flights/search/request',
-						{request: JSON.stringify(params)},
-						function (text, request) {
-							var response;
+						try {
+							response = JSON.parse(text);
 
-							try {
-								response = JSON.parse(text);
-
-								// Checking for errors
-								if (!response.system || !response.system.error) {
-									// Empty results check (automatically passed if we have a delayed search)
-									if (
-										self.delayedSearch ||
-										!response.flights.search.results.info.errorCode
-									) {
-										self.goToResults(response.flights.search.request.id);
-									}
-									else {
-										searchError('emptyResult');
-									}
+							// Checking for errors
+							if (!response.system || !response.system.error) {
+								// Empty results check (automatically passed if we have a delayed search)
+								if (
+									self.delayedSearch ||
+									!response.flights.search.results.info.errorCode
+								) {
+									self.goToResults(response.flights.search.request.id);
 								}
 								else {
-									searchError('systemError', response.system.error);
+									self.onSearchErrorOccured('emptyResult');
 								}
 							}
-							catch (e) {
-								searchError('brokenJSON', text);
+							else {
+								self.onSearchErrorOccured('systemError', response.system.error);
 							}
-						},
-						function (request) {
-							searchError('requestFailed', [request.status, request.statusText]);
 						}
-					)
-				);
+						catch (e) {
+							self.onSearchErrorOccured('brokenJSON', text);
+						}
+					},
+					function (request) {
+						self.onSearchErrorOccured('requestFailed', [request.status, request.statusText]);
+					}
+				)
+			);
+		};
+
+		FlightsSearchFormController.prototype.onSearchErrorOccured = function (message, systemData) {
+			if (typeof systemData != 'undefined' && systemData[0] !== 0) {
+				this.$$controller.error('SEARCH ERROR: '+message, systemData);
 			}
+
+			if (typeof systemData == 'undefined' || systemData[0] !== 0) {
+				this.searchError(this.$$controller.i18n('FlightsSearchForm', 'searchError_' + message));
+			}
+
+			this.isSearching(false);
 		};
 
 		FlightsSearchFormController.prototype.abortSearch = function () {
@@ -913,22 +986,42 @@ define(
 		};
 
 		FlightsSearchFormController.prototype.buildModels = function () {
-			var geo = {
-					cities: {},
-					countries: {},
-					airports: {}
-				},
-				tmpass = {},
-				today = new Date(),
-				self = this;
-
 			// Checking for errors
 			if (this.$$rawdata.system && this.$$rawdata.system.error) {
 				this.$$error(this.$$rawdata.system.error.message);
 				return;
 			}
 
-			// Processing options
+			// Build options
+			this.buildInitialOptions();
+
+			// Build segments
+			this.buildInitialSegments();
+
+			// Fill passengers
+			this.buildInitialPassengers();
+
+			// All changes from now on will go to cookie
+			this.setCookies = true;
+
+			this.initialParams = this.URLParams();
+			this.parametersChanged(false);
+
+			// All seems OK - starting search if needed
+			if (this.mode == 'preinitted' && this.preinittedData.immediateSearch) {
+				this.$$loading(false);
+				this.startSearch();
+			}
+			else {
+				this.loadAirlines();
+			}
+		};
+
+		FlightsSearchFormController.prototype.buildInitialOptions = function () {
+			var today = new Date();
+
+			today.setHours(0,0,0,0);
+
 			// Passengers maximums
 			this.options = this.$$rawdata.flights.search.formData.maxLimits;
 			this.options.totalPassengers = parseInt(this.options.totalPassengers);
@@ -937,21 +1030,35 @@ define(
 			this.passengersUseExtendedSelect = this.$$rawdata.flights.search.formData.passengersSelect.extendedPassengersSelect;
 			this.passengersFastSelectOptions = this.$$rawdata.flights.search.formData.passengersSelect.fastPassengersSelect;
 
+			this.passengersAltSelect = this.$$rawdata.flights.search.formData.passengersSelect.passengersSelectAlt;
+
 			// Date options
 			this.options.dateOptions = this.$$rawdata.flights.search.formData.dateOptions;
-			today.setHours(0,0,0,0);
+			this.options.dateOptions.incorrectDatesBlock = false;
+
 			this.options.dateOptions.minDate = new Date(today);
 			this.options.dateOptions.minDate.setDate(this.options.dateOptions.minDate.getDate() + this.options.dateOptions.minOffset);
 			this.options.dateOptions.maxDate = new Date(today);
 			this.options.dateOptions.maxDate.setDate(this.options.dateOptions.maxDate.getDate() + this.options.dateOptions.maxOffset);
 
+			this.showCitySwapBtn = this.$$rawdata.flights.search.formData.showCitySwapBtn;
+			
+			this.searchWithoutAdults = this.$$rawdata.flights.search.formData.searchWithoutAdults;
+		};
+
+		FlightsSearchFormController.prototype.buildInitialSegments = function () {
 			// Processing segments
 			if (this.mode == 'preinitted') {
 				var tmp;
 
 				for (var i = 0; i < this.preinittedData.segments.length; i++) {
 					var depdata = null,
-						arrdata = null;
+						arrdata = null,
+						todayTimestamp = new Date();
+
+					todayTimestamp.setHours(0,0,0);
+
+					todayTimestamp = Math.floor(todayTimestamp.getTime() / 1000);
 
 					if (this.preinittedData.segments[i][0]) {
 						depdata = this.$$controller.getModel('Flights/Common/Geo', {
@@ -975,10 +1082,22 @@ define(
 						});
 					}
 
+					// Checking date for validity
+					if (this.preinittedData.segments[i][2]) {
+						tmp = this.$$controller.getModel('Common/Date', this.preinittedData.segments[i][2]);
+
+						if (tmp.getTimestamp() < todayTimestamp) {
+							tmp = null;
+						}
+					}
+					else {
+						tmp = null;
+					}
+
 					this.addSegment(
 						depdata,
 						arrdata,
-						this.preinittedData.segments[i][2] ? this.$$controller.getModel('Common/Date', this.preinittedData.segments[i][2]) : null
+						tmp
 					);
 				}
 
@@ -1011,6 +1130,7 @@ define(
 				this.directFlights(this.preinittedData.direct);
 				this.vicinityDates(this.preinittedData.vicinityDates);
 				this.serviceClass(this.preinittedData.serviceClass);
+				this.flightNumbers(this.preinittedData.flightNumbers || []);
 			}
 			else {
 				for (var i = 0; i < this.$$rawdata.flights.search.request.segments.length; i++) {
@@ -1038,8 +1158,12 @@ define(
 					this.tripType(this.$$rawdata.flights.search.request.parameters.searchType);
 				}
 			}
+		};
 
-			// Passengers
+		FlightsSearchFormController.prototype.buildInitialPassengers = function () {
+			var tmpass = {},
+				tmp;
+
 			// Processing passengers counts
 			var usePreInittedPassengers = this.mode == 'preinitted' && Object.keys(this.preinittedData.passengers).length > 0;
 			for (var i = 0; i < this.$$rawdata.flights.search.request.passengers.length; i++) {
@@ -1075,54 +1199,60 @@ define(
 
 				this.fillPreInittedPassengers(tmp, this.preinittedData.passengers);
 			}
+		};
 
-			// All changes from now on will go to cookie
-			this.setCookies = true;
+		FlightsSearchFormController.prototype.loadAirlines = function () {
+			var self = this;
 
-			this.initialParams = this.URLParams();
-			this.parametersChanged(false);
+			// Loading airlines
+			if (!this.carriersLoaded()) {
+				this.$$controller.loadData(
+					'/guide/airlines/all',
+					{},
+					function (text, request) {
+						try {
+							var tmp = JSON.parse(text);
 
-			// All seems OK - starting search if needed
-			if (this.mode == 'preinitted' && this.preinittedData.immediateSearch) {
-				this.$$loading(false);
-				this.startSearch();
-			}
-			else {
-				// Loading airlines
-				if (!this.carriersLoaded()) {
-					this.$$controller.loadData(
-						'/guide/airlines/all',
-						{},
-						function (text, request) {
-							try {
-								var tmp = JSON.parse(text);
+							// Checking for set data (to not double-fill it)
+							if (FlightsSearchFormController.prototype.carriers instanceof Array) {
+								self.carriersLoaded(true);
+								return;
+							}
 
-								if (tmp.guide && tmp.guide.airlines) {
-									for (var i in tmp.guide.airlines) {
-										if (tmp.guide.airlines.hasOwnProperty(i)) {
-											if (FlightsSearchFormController.prototype.carriers === null) {
-												FlightsSearchFormController.prototype.carriers = [];
-											}
+							if (FlightsSearchFormController.prototype.carriers === null) {
+								FlightsSearchFormController.prototype.carriers = [];
+							}
 
-											FlightsSearchFormController.prototype.carriers.push(self.$$controller.getModel('Flights/Common/Airline', tmp.guide.airlines[i]));
-										}
+							if (tmp.guide && tmp.guide.airlines) {
+								for (var i in tmp.guide.airlines) {
+									if (tmp.guide.airlines.hasOwnProperty(i) && i) {
+
+										FlightsSearchFormController.prototype.carriers.push(self.$$controller.getModel('Flights/Common/Airline', tmp.guide.airlines[i]));
+									}
+								}
+
+								FlightsSearchFormController.prototype.carriers.sort(function (a, b) {
+									if (!a.name || !b.name) {
+										return 0;
 									}
 
-									self.carriersLoaded(true);
-								}
-								else {
-									self.$$controller.warn('Can not load carriers list, wrong data');
-								}
+									return a.name.localeCompare(b.name);
+								});
+
+								self.carriersLoaded(true);
 							}
-							catch (e) {
-								self.$$controller.warn(e);
+							else {
+								self.$$controller.warn('Can not load carriers list, wrong data');
 							}
-						},
-						function () {
-							self.$$controller.warn('Can not load carriers list');
 						}
-					);
-				}
+						catch (e) {
+							self.$$controller.warn(e);
+						}
+					},
+					function () {
+						self.$$controller.warn('Can not load carriers list');
+					}
+				);
 			}
 		};
 
@@ -1199,6 +1329,13 @@ define(
 			}
 
 			return ret;
+		};
+
+		FlightsSearchFormController.prototype.citySwap = function(index) {
+			var tmp = this.segments()[index].items.departure.value();
+
+			this.segments()[index].items.departure.value( this.segments()[index].items.arrival.value() );
+			this.segments()[index].items.arrival.value( tmp );
 		};
 
 		FlightsSearchFormController.prototype.pageTitle = 'FlightsSearch';

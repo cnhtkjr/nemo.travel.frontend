@@ -38,13 +38,13 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 		&__inner {
 			display: table;
 			padding-bottom: 0;
-			width: 1280px;
-			max-width: 1280px;
+			//width: 1280px;
+			max-width: 1680px;
 		}
 	}
 
 	&__additional {
-		max-width: 1280px;
+		max-width: 1260px;
 		margin: 20px auto;
 		padding: 0 30px;
 
@@ -61,14 +61,17 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 		&__parameters {
 			&__toggle {
 				display: inline-block;
+
+				@media (max-width: 500px) {
+					width: 100%;
+				}
 			}
 
 			&__dropdown {
 				left: 0;
 				right: auto;
-				max-width: 400px;
-				width: 100%;
 				min-width: 1px;
+				width: 400px;
 				padding: 20px;
 				color: #636467;
 				cursor: auto;
@@ -103,6 +106,7 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 					display: inline-block;
 					vertical-align: top;
 					width: 67%;
+					max-width: 67%;
 
 					&__maxPriceField {
 						margin: 0;
@@ -166,9 +170,38 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 			&__timeEnRoute {
 				&__subTitle {
 					display: inline-block;
-					vertical-align: top;
+					vertical-align: middle;
 					padding: 5px 10px 0 0;
 					line-height: 20px;
+				}
+
+				&__select {
+					max-width: 100%;
+					vertical-align: middle;
+					margin-top: 5px;
+					min-height: 30px;
+					padding: 0 5px;
+					background-color: transparent;
+					border: $i_ui_input_border;
+
+					&:focus {
+						outline: none;
+						border: $i_ui_input_border_focus;
+					}
+				}
+			}
+
+			&__carrierSelect {
+				max-width: 100%;
+				vertical-align: middle;
+				min-height: 30px;
+				padding: 0 5px;
+				background-color: transparent;
+				border: $i_ui_input_border;
+
+				&:focus {
+					outline: none;
+					border: $i_ui_input_border_focus;
 				}
 			}
 		}
@@ -203,6 +236,9 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 			&_returnSegment {
 				width: 20%;
 			}
+			&_CR{
+				position: relative;
+			}
 
 			&_CR, &_returnSegment &__item_date {
 				width: 100%;
@@ -229,17 +265,17 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 				line-height: 40px;
 				font-size: 105%;
 				color: $nemo-color-text-main;
-				&::-webkit-input-placeholder {
-					line-height: 42px;
-				}
 
+				&::-webkit-input-placeholder {
+					//line-height: 42px;
+				}
 
 
 				&, &:focus {
 					border: 0;
 
 					&::-webkit-input-placeholder {
-						line-height: 40px;
+						//line-height: 30px;
 					}
 				}
 
@@ -253,7 +289,13 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 				}
 
 				&::-webkit-input-placeholder {
-					line-height: 40px;
+					//line-height: 30px;
+				}
+
+				@media (max-width: 500px) {
+					&::-webkit-input-placeholder {
+						line-height: 30px;
+					}
 				}
 			}
 
@@ -320,6 +362,48 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 
 				&__inputContainer {
 					margin: 0;
+				}
+
+				&__citySwap{
+					width: 40px;
+					height: 40px;
+					position: absolute;
+					right: 0;
+					top: 0;
+					cursor: pointer;
+					background: #e6e6e6;
+
+					&:before{
+						content: '';
+						width: 17px;
+						height: 7px;
+						background-image: url(images/arrow.svg);
+						position: absolute;
+						top: 12px;
+						left: 12px;
+						transform: translateX(1px);
+						transition: transform .1s ease-in-out;
+					}
+
+					&:after{
+						content: '';
+						width: 17px;
+						height: 7px;
+						background-image: url(images/arrow.svg);
+						position: absolute;
+						top: 21px;
+						left: 12px;
+						transform: rotate(180deg) translateX(1px);
+						transition: transform .1s ease-in-out;
+					}
+
+					&:hover:before{
+						transform: translateX(3px);
+					}
+
+					&:hover:after{
+						transform: rotate(180deg) translateX(3px);
+					}
 				}
 			}
 		}
@@ -388,10 +472,10 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 			width: 28px;
 			height: 26px;
 			background: #B23E13 url("images/fsf-sprite.svg") 7px -83.5px no-repeat;
-			top: 50%;
+			top: 0;
 			right: 100%;
 			cursor: pointer;
-			margin-top: -13px;
+			margin-top: 5px;
 
 			&:hover {
 				background-color: lighten(#B23E13, 10%);
@@ -462,6 +546,13 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 					padding-right: 30px;
 					text-align: left;
 					display: block;
+					//sry for important, problem in landscape on devices. Important is better than js solution.
+					max-width: 30vw!important;
+					min-width: 1px!important;
+
+					@media (max-width: 500px) {
+						max-width: 100% !important;
+					}
 
 					&:after {
 						right: 9px;
@@ -529,6 +620,9 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 		&__containerColumn {
 			display: none;
 			@extend .nemo-flights-form__routeOptions__item__selector__button;
+			@media (max-width: 500px) {
+				max-width: 100% !important;
+			}
 			text-align: left;
 			/*margin: 0;*/
 			/*line-height: 30px;*/
@@ -561,6 +655,91 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 
 		&__fastSelect {
 			display: block;
+		}
+
+		&__buttonSelect {
+			display: block;
+
+			&__item {
+				padding: 10px 15px;
+				border-bottom: 1px solid #DCDCDC;
+				color: #0072AE;
+				font-size: 14px;
+				display: flex;
+				flex-flow: row nowrap;
+				flex-direction: flex-end;
+				align-items: center;
+				justify-content: flex-end;
+				cursor: auto;
+
+				&__name, &__count, &__desc {
+					display: inline-block;
+					vertical-align: middle;
+				}
+
+				&__count {
+					color: #6B6B6B;
+					padding: 0 20px 0 10px;
+					flex: 0 0 auto;
+
+					&__count {
+						display: inline-block;
+						vertical-align: top;
+						line-height: 30px;
+						width: 25px;
+						text-align: center;
+					}
+
+					&__plus, &__minus {
+						display: inline-block;
+						vertical-align: top;
+						width: 30px;
+						height: 30px;
+						border-radius: 50%;
+						border: 1px solid #CAE0ED;
+						transition: all .2s;
+						cursor: pointer;
+						position: relative;
+
+						&:hover {
+							background-color: #E1F5FF;
+						}
+
+						&_disabled {
+							opacity: 0;
+						}
+
+						&:after {
+							content: '';
+							background: url(images/fsf-sprite.svg);
+							width: 10px;
+							height: 10px;
+							position: absolute;
+							top: 9px;
+							left: 9px;
+						}
+					}
+
+					&__plus:after {
+						background-position: -35px -122px;
+					}
+
+					&__minus:after {
+						background-position: -35px -97px;
+					}
+				}
+
+				&__desc {
+					color: #A6A6A6;
+					width: 85px;
+					flex-shrink: 0;
+				}
+
+				&__name {
+					margin-right: auto;
+					white-space: normal;
+				}
+			}
 		}
 	}
 
@@ -700,6 +879,9 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 
 		&__select {
 			@extend .nemo-flights-form__routeOptions__item__selector__button;
+			@media (max-width: 500px) {
+				max-width: 100% !important;
+			}
 			margin: 0;
 			line-height: 30px;
 			height: 30px;
@@ -806,7 +988,6 @@ $i_flights_form_segment_toRT_hover = inset 0 0 16px rgba($nemo-color-LightPoint,
 		}
 	}
 }
-
 @keyframes nemo-flights-form__searchingInfoPopup__headerAnimation {
 	0% {transform: rotate(0deg);}
 	100% {transform: rotate(360deg);}

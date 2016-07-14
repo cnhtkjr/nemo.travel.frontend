@@ -35,6 +35,16 @@ define(
 				);
 
 				$(element).chosen(options);
+				//preventing strange glitch with "no results" <li> and focus
+				var closeChosen = function(){
+					console.log(element);
+					$(element).trigger('chosen:close')
+				};
+				$(document).on('click', '.no-results', closeChosen);
+				ko.utils.domNodeDisposal.addDisposeCallback(element, function() {
+					$(document).off('click', '.no-results', closeChosen);
+				});
+
 			},
 			update: function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {}
 		};
@@ -46,7 +56,15 @@ define(
 				var text;
 
 				if (typeof item.label == 'undefined') {
-					text = item.name.replace(new RegExp('('+this.term+')', 'i'), '<span class="nemo-ui-autocomplete__match">$1</span>') + '<span class="nemo-flights-form__geoAC__item__country">, ' + item.country.name + '</span>';
+					text = item.name
+							.replace(
+								new RegExp(
+									'(' + (this.term.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '')) + ')',
+									''
+								),
+								'<span class="nemo-ui-autocomplete__match">$1</span>'
+							) +
+						(item.country ? '<span class="nemo-flights-form__geoAC__item__country">, ' + item.country.name + '</span>' : '');
 				}
 				else {
 					text = item.label;
@@ -73,6 +91,8 @@ define(
 			init: function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
 				var $element = $(element),
 					noResultsResults = [{value: '', label: viewModel.$$controller.i18n('FlightsSearchForm', 'autocomplete_noResults')}];
+
+				$element.on('focus', function (e) {$(this).val('');});
 
 				$element.FlightsFormGeoAC({
 					minLength: 2,
@@ -136,10 +156,10 @@ define(
 					},
 					focus: function( event, ui ) {
 						event.preventDefault();
-						$(this).val(ui.item.name)
+						$element.val(ui.item.name)
 					},
 					close:function(){
-						$(this).val(' ')
+						$element.val('')
 					}
 
 				});
@@ -147,6 +167,7 @@ define(
 				$element.on('blur', function (e) {
 					$element.val('');
 				});
+
 				$element.on('keyup',function(e){
 					if(
 						e.keyCode == 13
@@ -213,8 +234,138 @@ define(
 			update: function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {}
 		};
 
-		var PMULocale;
 		ko.bindingHandlers.flightsFormDatepicker = {
+			// Auxiliary stuff/extension points
+			_PMULocale: null,
+			_getPMULocale: function (bindingContext) {
+				if (!ko.bindingHandlers.flightsFormDatepicker._PMULocale) {
+					ko.bindingHandlers.flightsFormDatepicker._PMULocale = {
+						days:        [], // ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+						daysShort:   [], // ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+						daysMin:     [], // ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+						months:      [], // ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+						monthsShort: []  // ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+					};
+
+					for (var i = 1; i <= 12; i++) {
+						ko.bindingHandlers.flightsFormDatepicker._PMULocale.months.push(bindingContext.$root.i18n('dates', 'month_' + i + '_f_n'));
+						ko.bindingHandlers.flightsFormDatepicker._PMULocale.monthsShort.push(bindingContext.$root.i18n('dates', 'month_' + i + '_s_n'));
+
+						if (i == 1) {
+							ko.bindingHandlers.flightsFormDatepicker._PMULocale.days.push(bindingContext.$root.i18n('dates', 'dow_7_f'));
+							ko.bindingHandlers.flightsFormDatepicker._PMULocale.daysShort.push(bindingContext.$root.i18n('dates', 'dow_7_s'));
+							ko.bindingHandlers.flightsFormDatepicker._PMULocale.daysMin.push(bindingContext.$root.i18n('dates', 'dow_7_s'));
+						}
+
+						if (i <= 7) {
+							ko.bindingHandlers.flightsFormDatepicker._PMULocale.days.push(bindingContext.$root.i18n('dates', 'dow_' + i + '_f'));
+							ko.bindingHandlers.flightsFormDatepicker._PMULocale.daysShort.push(bindingContext.$root.i18n('dates', 'dow_' + i + '_s'));
+							ko.bindingHandlers.flightsFormDatepicker._PMULocale.daysMin.push(bindingContext.$root.i18n('dates', 'dow_' + i + '_s'));
+						}
+					}
+				}
+
+				return ko.bindingHandlers.flightsFormDatepicker._PMULocale;
+			},
+			_PMUbeforeShow: function(bindingContext, viewModel){
+				var minDate = viewModel.form.options.dateOptions.minDate,
+					maxDate = viewModel.form.options.dateOptions.maxDate,
+					$elt = $(this),
+					segments = viewModel.form.segments();
+
+				for (var i = 0, c = segments.length; i < c; i++) {
+					var segment = segments[i];
+
+					if(
+						segment.index < viewModel.index
+						&&
+						segment.items.departureDate.value() != null
+					) {
+						minDate = segment.items.departureDate.value().dateObject();
+					}
+
+					if(
+						segment.index > viewModel.index
+						&&
+						segment.items.departureDate.value() != null
+					) {
+						maxDate = segment.items.departureDate.value().dateObject();
+						break;
+					}
+				}
+
+				// Setting shown date (current segment selected or minimal valid)
+				$elt.data('pickmeup-options').defaultDate = viewModel.items.departureDate.value() ? viewModel.items.departureDate.value().dateObject() : minDate;
+
+				if (viewModel.form.options.dateOptions.incorrectDatesBlock) {
+					$elt.data('pickmeup-options').max = maxDate;
+					$elt.data('pickmeup-options').min = minDate;
+				}
+			},
+			_PMUonSetDate: function ($element, valueAccessor, viewModel) {
+				$element.blur();
+
+				valueAccessor()(viewModel.$$controller.getModel('Common/Date', this.current));
+
+				// Autofocus stuff
+				$element.trigger('nemo.fsf.segmentPropChanged');
+			},
+			_PMUrender: function (dateObj, viewModel, month) {
+				var ret = viewModel.form.getSegmentDateParameters(dateObj, viewModel.index);
+
+				ret.className = '';
+
+				if (ret.segments.length > 0 && dateObj.getMonth() == month) {
+					ret.className = 'nemo-pmu-date_hilighted';
+					for (var i = 0; i < ret.segments.length; i++) {
+						ret.className += ' nemo-pmu-date_hilighted_' + ret.segments[i];
+					}
+				}
+
+				ret.className += ret.period ? ' nemo-pmu-date_period' : '';
+
+				delete ret.segments;
+				delete ret.period;
+
+				return ret;
+			},
+			_getPMUOptions: function (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
+				var date = viewModel.form.options.dateOptions.minDate,
+					segments = viewModel.form.segments();
+
+				for (var i = 0, c = segments.length; i < c; i++) {
+					var segment = segments[i];
+
+					if(
+						segment.index < viewModel.index
+						&&
+						segment.items.departureDate.value() != null
+					) {
+						date = segment.items.departureDate.value().dateObject();
+					}
+				}
+
+				return {
+					className: 'nemo-flights-form__datePicker',
+					locale: ko.bindingHandlers.flightsFormDatepicker._getPMULocale(bindingContext),
+					calendars: mobileDetect().deviceType != 'desktop' ? 1 : 2,
+					min: viewModel.form.options.dateOptions.minDate,
+					max: viewModel.form.options.dateOptions.maxDate,
+					format: 'd.m.Y',
+					hideOnSelect: true,
+					defaultDate: date,
+					render: function (dateObj, month) {
+						return ko.bindingHandlers.flightsFormDatepicker._PMUrender.call(this, dateObj, viewModel, month);
+					},
+					onSetDate: function () {
+						return ko.bindingHandlers.flightsFormDatepicker._PMUonSetDate.call(this, $(element), valueAccessor, viewModel);
+					},
+					beforeShow: function () {
+						return ko.bindingHandlers.flightsFormDatepicker._PMUbeforeShow.call(this, bindingContext, viewModel);
+					}
+				};
+			},
+			// Methods needed by knockout
 			init: function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
 				var $element = $(element);
 
@@ -229,105 +380,18 @@ define(
 				});
 
 				if(mobileDetect().deviceType != 'desktop'){
-					$element.attr('readonly', 'true')
+					$element.attr('readonly', 'true');
 				}
-
 			},
 			update: function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
-				var $element = $(element);
-
-				if (!PMULocale) {
-					PMULocale = {
-						days:        [], // ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-						daysShort:   [], // ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-						daysMin:     [], // ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
-						months:      [], // ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-						monthsShort: []  // ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-					};
-
-					for (var i = 1; i <= 12; i++) {
-						PMULocale.months.push(bindingContext.$root.i18n('dates', 'month_' + i + '_f_n'));
-						PMULocale.monthsShort.push(bindingContext.$root.i18n('dates', 'month_' + i + '_s_n'));
-
-						if (i == 1) {
-							PMULocale.days.push(bindingContext.$root.i18n('dates', 'dow_7_f'));
-							PMULocale.daysShort.push(bindingContext.$root.i18n('dates', 'dow_7_s'));
-							PMULocale.daysMin.push(bindingContext.$root.i18n('dates', 'dow_7_s'));
-						}
-
-						if (i <= 7) {
-							PMULocale.days.push(bindingContext.$root.i18n('dates', 'dow_' + i + '_f'));
-							PMULocale.daysShort.push(bindingContext.$root.i18n('dates', 'dow_' + i + '_s'));
-							PMULocale.daysMin.push(bindingContext.$root.i18n('dates', 'dow_' + i + '_s'));
-						}
-					}
-				}
-				var calendarsToShow = mobileDetect().deviceType != 'desktop' ? 1 : 2;
-
-				$element.pickmeup({
-					className: 'nemo-flights-form__datePicker',
-					locale: PMULocale,
-					calendars: calendarsToShow,
-					min: bindingContext.$parent.options.dateOptions.minDate,
-					max: bindingContext.$parent.options.dateOptions.maxDate,
-					format: 'd.m.Y',
-					hideOnSelect: true,
-					defaultDate: valueAccessor()() ? valueAccessor()().dateObject() : viewModel.form.dateRestrictions[viewModel.index][0],
-					render: function (dateObj) {
-						var ret = viewModel.form.getSegmentDateParameters(dateObj, viewModel.index);
-						ret.className = '';
-						if (ret.segments.length > 0) {
-							ret.className = 'nemo-pmu-date_hilighted';
-							for (var i = 0; i < ret.segments.length; i++) {
-								ret.className += ' nemo-pmu-date_hilighted_' + ret.segments[i];
-							}
-						}
-
-						ret.className += ret.period ? ' nemo-pmu-date_period' : '';
-
-						delete ret.segments;
-						delete ret.period;
-
-						return ret;
-					},
-					onSetDate: function () {
-						$element.blur();
-
-						valueAccessor()(viewModel.$$controller.getModel('Common/Date', this.current));
-
-						// Autofocus stuff
-						$element.trigger('nemo.fsf.segmentPropChanged');
-					},
-					beforeShow:function(){
-						var minDate =  bindingContext.$parent.options.dateOptions.minDate,
-							maxDate =  bindingContext.$parent.options.dateOptions.maxDate;
-						for(var segment in viewModel.form.segments()){
-							var $this = viewModel.form.segments()[segment];
-							if($this.index < viewModel.index
-								&&
-								$this.items.departureDate.value() != null)
-							{
-								minDate = $this.items.departureDate.value().dateObject();
-							}
-							if($this.index > viewModel.index
-								&&
-								$this.items.departureDate.value() != null)
-							{
-								maxDate = $this.items.departureDate.value().dateObject();
-								break;
-							}
-						}
-						$(this).data('pickmeup-options').max = maxDate;
-						$(this).data('pickmeup-options').min = minDate;
-					}
-				});
+				$(element).pickmeup(ko.bindingHandlers.flightsFormDatepicker._getPMUOptions(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext));
 			}
 		};
 
 		ko.bindingHandlers.flightsFormRTAutoFocus = {
 			init: function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
 				var setFocus = function(){
-					bindingContext.$parent.segments()[1].items.departureDate.focus(true)
+					setTimeout(function () {bindingContext.$parent.segments()[1].items.departureDate.focus(true);}, 10);
 				};
 				$(element).on('click', setFocus);
 				ko.utils.domNodeDisposal.addDisposeCallback(element, function() {

@@ -2,7 +2,7 @@
 define(
 	['knockout', 'js/vm/helpers', 'js/vm/BaseControllerModel', 'jsCookie'],
 	function (ko, helpers, BaseControllerModel, Cookie) {
-		function FlightsSearchResultsController (componentParameters) {
+		function FlightsSearchResultsController(componentParameters) {
 			BaseControllerModel.apply(this, arguments);
 
 			var self = this,
@@ -38,7 +38,7 @@ define(
 						},
 						options: {
 							// Filter-specific options here
-							valuesSorter: function (a,b) {
+							valuesSorter: function (a, b) {
 								return a.value - b.value;
 							},
 							additionalValueChooser: stringPFMinPrice
@@ -64,8 +64,14 @@ define(
 									currency = initParams.items[keys[0]].getTotalPrice().currency();
 								}
 
-								this.displayValues.min = this.$$controller.getModel('Common/Money', {amount: 0, currency: currency});
-								this.displayValues.max = this.$$controller.getModel('Common/Money', {amount: 0, currency: currency});
+								this.displayValues.min = this.$$controller.getModel('Common/Money', {
+									amount: 0,
+									currency: currency
+								});
+								this.displayValues.max = this.$$controller.getModel('Common/Money', {
+									amount: 0,
+									currency: currency
+								});
 							},
 							onValuesUpdate: function (newValue) {
 								this.displayValues.min.amount(newValue.min);
@@ -90,7 +96,7 @@ define(
 						},
 						options: {
 							// Filter-specific options here
-							valuesSorter: function (a,b) {
+							valuesSorter: function (a, b) {
 								return a.value.name.localeCompare(b.value.name);
 							},
 							additionalValueChooser: stringPFMinPrice,
@@ -152,7 +158,7 @@ define(
 						},
 						options: {
 							// Filter-specific options here
-							valuesSorter: function (a,b) {
+							valuesSorter: function (a, b) {
 								var sort = {
 									n: 0,
 									m: 1,
@@ -178,7 +184,7 @@ define(
 						},
 						options: {
 							// Filter-specific options here
-							valuesSorter: function (a,b) {
+							valuesSorter: function (a, b) {
 								var sort = {
 									n: 0,
 									m: 1,
@@ -201,7 +207,7 @@ define(
 						},
 						options: {
 							// Filter-specific options here
-							valuesSorter: function (a,b) {
+							valuesSorter: function (a, b) {
 								return a.value.name.localeCompare(b.value.name);
 							},
 							additionalValueChooser: stringPFMinPrice
@@ -217,7 +223,7 @@ define(
 						},
 						options: {
 							// Filter-specific options here
-							valuesSorter: function (a,b) {
+							valuesSorter: function (a, b) {
 								return a.value.name.localeCompare(b.value.name);
 							},
 							additionalValueChooser: stringPFMinPrice
@@ -244,8 +250,8 @@ define(
 						}
 					}
 				},
-				order: ['price','transfersCount','carrier','transfersDuration','departureTime','arrivalTime','departureAirport','arrivalAirport','timeEnRoute'],
-				grouppable: ['departureTime','arrivalTime'],
+				order: ['price', 'transfersCount', 'carrier', 'transfersDuration', 'departureTime', 'arrivalTime', 'departureAirport', 'arrivalAirport', 'timeEnRoute'],
+				grouppable: ['departureTime', 'arrivalTime'],
 				preInitValues: {
 					carrier: null,
 					price: null,
@@ -273,7 +279,7 @@ define(
 			this.groups = ko.observableArray([]);
 			this.visibleGroups = ko.observableArray([]);
 
-			this.shownGroups = ko.observable(12);
+			this.shownGroups = ko.observable(this.baseShownGroups);
 			this.totalVisibleGroups = ko.observable(0);
 
 			this.visibleResultsCount = ko.observable(0);
@@ -319,10 +325,11 @@ define(
 			this.searchInfo = ko.observable({});
 
 			this.postFilters = ko.observableArray([]);
+			this.postFiltersObject = ko.observable({});
 			this.visiblePostFilters = ko.observableArray([]);
 			this.usePostfilters = false;
 
-			this.possibleSorts = ['rating', 'price', 'durationOnLeg', 'carrierRating'];
+			this.possibleSorts = ['rating', 'price', 'durationOnLeg'];
 			this.sort = ko.observable(null);
 
 			this.displayTypes = ['tile', 'list'];
@@ -341,6 +348,7 @@ define(
 			this.matrixDataIndexSelected = ko.observable(null);
 
 			this.error = ko.observable(false);
+			this.warning = ko.observable(false);
 
 			this.resultsLoaded = ko.observable(false);
 
@@ -355,6 +363,7 @@ define(
 					direct: false,
 					aroundDates: 0,
 					serviceClass: 'All',
+					flightNumbers: null,
 					airlines: [],
 					delayed: true
 				}
@@ -367,34 +376,11 @@ define(
 			this.processInitParams();
 
 			this.displayType.subscribe(function (newValue) {
-				Cookie.set(this.$$controller.options.cookiesPrefix + this.resultsTypeCookie, newValue, { expires: 365 });
+				Cookie.set(this.$$controller.options.cookiesPrefix + this.resultsTypeCookie, newValue, {expires: 365});
 			}, this);
 
-			this.sort.subscribe(function (newValue) {
-				switch (newValue) {
-					case 'price':
-						this.groups.sort(function (a, b) {
-							return a.getTotalPrice().normalizedAmount() - b.getTotalPrice().normalizedAmount();
-						});
-						break;
-					case 'durationOnLeg':
-						this.groups.sort(function (a, b) {
-							return a.durationOnLeg() - b.durationOnLeg();
-						});
-						break;
-					case 'rating':
-						this.groups.sort(function (a, b) {
-							return b.recommendRating() - a.recommendRating();
-						});
-						break;
-					case 'carrierRating':
-						this.groups.sort(function (a, b) {
-							return b.getValidatingCompany().rating - a.getValidatingCompany().rating;
-						});
-						break;
-				}
-
-				this.buildVisibleGroups();
+			this.sort.subscribe(function (type) {
+				this.doSort(type);
 			}, this);
 
 			this.postFiltersHaveValue = ko.computed(function () {
@@ -411,13 +397,13 @@ define(
 
 			this.compareTablesDisplayable = ko.computed(function () {
 				return (
-					this.flightsCompareTableDirect() &&
-					this.flightsCompareTableDirect().isDisplayable()
-				) ||
-				(
-					this.flightsCompareTableTransfer() &&
-					this.flightsCompareTableTransfer().isDisplayable()
-				);
+						this.flightsCompareTableDirect() &&
+						this.flightsCompareTableDirect().isDisplayable()
+					) ||
+					(
+						this.flightsCompareTableTransfer() &&
+						this.flightsCompareTableTransfer().isDisplayable()
+					);
 			}, this);
 		}
 
@@ -425,9 +411,39 @@ define(
 		helpers.extendModel(FlightsSearchResultsController, [BaseControllerModel]);
 
 		FlightsSearchResultsController.prototype.paramsParsers = {
-			rtseg: /^([ac][A-Z]{3})([ac][A-Z]{3})(\d{8})(\d{8})$/g,
-			segs: /([ac][A-Z]{3})([ac][A-Z]{3})(\d{8})/g,
+			rtseg: /^([ac][A-ZА-Я]{3})([ac][A-ZА-Я]{3})(\d{8})(\d{8})$/g,
+			segs: /([ac][A-ZА-Я]{3})([ac][A-ZА-Я]{3})(\d{8})/g,
 			passengers: /([A-Z]{3})(\d+)/g
+		};
+
+		FlightsSearchResultsController.prototype.baseShownGroups = 12;
+
+		FlightsSearchResultsController.prototype.doSort = function (type) {
+			switch (type) {
+				case 'price':
+					this.groups.sort(function (a, b) {
+						return a.getTotalPrice().normalizedAmount() - b.getTotalPrice().normalizedAmount();
+					});
+					break;
+				case 'durationOnLeg':
+					this.groups.sort(function (a, b) {
+						return a.durationOnLeg() - b.durationOnLeg();
+					});
+					break;
+				case 'rating':
+					this.groups.sort(function (a, b) {
+						var ret = b.recommendRating() - a.recommendRating();
+
+						if (ret == 0) {
+							ret = a.getTotalPrice().normalizedAmount() - b.getTotalPrice().normalizedAmount();
+						}
+
+						return ret;
+					});
+					break;
+			}
+
+			this.buildVisibleGroups();
 		};
 
 		FlightsSearchResultsController.prototype.processInitParams = function () {
@@ -474,7 +490,7 @@ define(
 							IATA: tmpsegs[i][1].substr(1),
 							isCity: tmpsegs[i][1][0] == 'c'
 						},
-						departureDate: tmpsegs[i][2].substr(0,4) + '-' + tmpsegs[i][2].substr(4,2) + '-' + tmpsegs[i][2].substr(6) + 'T00:00:00'
+						departureDate: tmpsegs[i][2].substr(0, 4) + '-' + tmpsegs[i][2].substr(4, 2) + '-' + tmpsegs[i][2].substr(6) + 'T00:00:00'
 					});
 				}
 
@@ -503,11 +519,16 @@ define(
 					if (tmp[i].substr(0, 6) == 'class=') {
 						this.searchParameters.parameters.serviceClass = tmp[i].substr(6);
 					}
+					
+					// flight numbers
+					if (tmp[i].substr(0, 14) == 'flightNumbers=') {
+						this.searchParameters.parameters.flightNumbers = tmp[i].substr(14).split('+');
+					}
 				}
 			}
 
 			// Additional Preferences
-			if(this.$$componentParameters.route.length > 1) {
+			if (this.$$componentParameters.route.length > 1) {
 				if (this.$$componentParameters.route.length == 2) {
 					tmp = this.$$componentParameters.route[1];
 				}
@@ -582,25 +603,26 @@ define(
 					'/flights/search/flightInfo/' + flids[0],
 					{},
 					function (data, request) {
+						self.bookingCheckInProgress(false);
 
 						try {
 							data = JSON.parse(data);
 						}
 						catch (e) {
+							self.resultsLoaded(true);
 							self.bookingCheckError(self.$$controller.i18n('FlightsSearchResults', 'bookingCheck__error__error_wrongResponse'));
-							self.bookingCheckInProgress(false);
 							return;
 						}
 
 						if (data.system.error && data.system.error.message) {
-							self.bookingCheckInProgress(false);
+							self.resultsLoaded(true);
 							self.bookingCheckError(
 								self.$$controller.i18n('FlightsSearchResults', 'bookingCheck__error__error_serverError') + ' ' +
 								data.system.error.message
 							);
 						}
-						else if (!data.flights.search.flightInfo.isAvail) {
-							self.bookingCheckInProgress(false);
+						else if (self.options.needCheckAvail && !data.flights.search.flightInfo.isAvail) {
+							self.resultsLoaded(true);
 							self.bookingCheckError(self.$$controller.i18n('FlightsSearchResults', 'bookingCheck__error__error_unavailable'));
 						}
 						else {
@@ -614,7 +636,8 @@ define(
 								url = data.flights.search.flightInfo.createOrderLink;
 							}
 
-							if (data.flights.search.flightInfo.priceStatus.changed) {
+							if (data.flights.search.flightInfo.priceStatus.changed && !data.flights.search.flightInfo.hasAltFlights) {
+								self.resultsLoaded(true);
 								self.bookingCheckPriceChangeData({
 									url: url,
 									oldPrice: self.$$controller.getModel('Common/Money', data.flights.search.flightInfo.priceStatus.oldValue),
@@ -657,6 +680,7 @@ define(
 				segments: [],
 				tripType: '',
 				serviceClass: '',
+				flightNumbers: '',
 				passengers: {},
 				direct: false,
 				vicinityDates: 0
@@ -668,8 +692,14 @@ define(
 
 				// departureDate = 2015-04-11T00:00:00
 				searchInfo.segments.push({
-					departure: this.$$controller.getModel('Flights/Common/Geo', {data: data.departure, guide: this.$$rawdata.guide}),
-					arrival: this.$$controller.getModel('Flights/Common/Geo', {data: data.arrival, guide: this.$$rawdata.guide}),
+					departure: this.$$controller.getModel('Flights/Common/Geo', {
+						data: data.departure,
+						guide: this.$$rawdata.guide
+					}),
+					arrival: this.$$controller.getModel('Flights/Common/Geo', {
+						data: data.arrival,
+						guide: this.$$rawdata.guide
+					}),
 					departureDate: this.$$controller.getModel('Common/Date', data.departureDate)
 				});
 			}
@@ -684,16 +714,12 @@ define(
 			searchInfo.serviceClass = this.$$rawdata.flights.search.request.parameters.serviceClass;
 			searchInfo.vicinityDates = this.$$rawdata.flights.search.request.parameters.aroundDates;
 			searchInfo.direct = this.$$rawdata.flights.search.request.parameters.direct;
+			searchInfo.flightNumbers = this.$$rawdata.flights.search.request.parameters.flightNumbers;
 
 			this.searchInfo(searchInfo);
 		};
 
-		FlightsSearchResultsController.prototype.processSearchResults = function () {
-			var setSegmentsGuide = true,
-				self = this,
-				tmpGroups = {},
-				tmp;
-
+		FlightsSearchResultsController.prototype.clearResults = function () {
 			this.segments = {};
 			this.prices = {};
 			this.flights = {};
@@ -707,12 +733,27 @@ define(
 			this.matrixDataIndexSelected(null);
 			this.groups([]);
 			this.visibleGroups([]);
-			this.shownGroups(12);
+			this.shownGroups(this.baseShownGroups);
 			this.totalVisibleGroups(0);
 			this.visibleResultsCount(0);
 			this.totalResultsCount = 0;
+		};
 
-			if (typeof this.$$rawdata.system != 'undefined' && typeof this.$$rawdata.system.error != 'undefined') {
+		FlightsSearchResultsController.prototype.processSearchResults = function () {
+			var setSegmentsGuide = true,
+				self = this,
+				tmpGroups = {},
+				displayResults = true,
+				sort = this.sort(),
+				newsort,
+				tmp;
+
+			this.clearResults();
+
+			if (
+				typeof this.$$rawdata.system != 'undefined' &&
+				typeof this.$$rawdata.system.error != 'undefined'
+			) {
 				this.$$error(this.$$rawdata.system.error.message);
 			}
 			else {
@@ -740,16 +781,43 @@ define(
 				}
 
 				this.airlinesByRating = Object.keys(this.airlines)
-					.map(function (key) {return self.airlines[key]})
+					.map(function (key) {
+						return self.airlines[key]
+					})
 					.sort(function (a, b) {
 						return parseFloat(b.rating) - parseFloat(a.rating);
 					});
 
+				// 204 error processing (204 means there's no flights we were looking for but we have alternatives)
+				if (
+					this.$$rawdata.flights.search.results.info &&
+					this.$$rawdata.flights.search.results.info.errorCode == 204
+				) {
+					this.warning(this.$$rawdata.flights.search.results.info.errorCode);
+				}
+
 				// Checking results
-				if (this.$$rawdata.flights.search.results.info && this.$$rawdata.flights.search.results.info.errorCode) {
+				if (
+					this.$$rawdata.flights.search.results.info &&
+					this.$$rawdata.flights.search.results.info.errorCode &&
+					this.$$rawdata.flights.search.results.info.errorCode != 204
+				) {
 					this.error(this.$$rawdata.flights.search.results.info.errorCode);
 				}
 				else {
+					// If there's no warnings and no errors and we have only one flight
+					// and we were searcing for specific flights - book it immediately
+					// TODO make a setting for that
+					if (
+						!this.warning() &&
+						this.$$rawdata.flights.search.results.flightGroups.length == 1 &&
+						this.$$rawdata.flights.search.results.flightGroups[0].flights.length == 1 &&
+						this.searchInfo().flightNumbers.length > 0
+					) {
+						this.bookFlight([this.$$rawdata.flights.search.results.flightGroups[0].flights[0].id]);
+						displayResults = false;
+					}
+
 					if (this.$$rawdata.flights.search.resultMatrix && this.$$rawdata.flights.search.resultMatrix.rangeData) {
 						var days = this.$$rawdata.flights.search.request.parameters.aroundDates,
 							matrixHash = {},
@@ -823,10 +891,10 @@ define(
 
 						for (var i = 0; i < matrixData.length; i++) {
 							var tmp = {
-									days: [],
-									hasResults: false,
-									minPrice: null
-								};
+								days: [],
+								hasResults: false,
+								minPrice: null
+							};
 
 							for (var j = 0; j < matrixData[i].length; j++) {
 								if (matrixData[i][j].price && (!tmp.minPrice || tmp.minPrice.normalizedAmount() > matrixData[i][j].price.normalizedAmount())) {
@@ -856,8 +924,8 @@ define(
 						// Processing segments
 						for (var i in this.$$rawdata.flights.search.results.groupsData.segments) {
 							if (this.$$rawdata.flights.search.results.groupsData.segments.hasOwnProperty(i)) {
-								this.$$rawdata.flights.search.results.groupsData.segments[i].depTerminal = (this.$$rawdata.flights.search.results.groupsData.segments[i].depTerminal || '').replace(/\s/,'');
-								this.$$rawdata.flights.search.results.groupsData.segments[i].arrTerminal = (this.$$rawdata.flights.search.results.groupsData.segments[i].arrTerminal || '').replace(/\s/,'');
+								this.$$rawdata.flights.search.results.groupsData.segments[i].depTerminal = (this.$$rawdata.flights.search.results.groupsData.segments[i].depTerminal || '').replace(/\s/, '');
+								this.$$rawdata.flights.search.results.groupsData.segments[i].arrTerminal = (this.$$rawdata.flights.search.results.groupsData.segments[i].arrTerminal || '').replace(/\s/, '');
 
 								this.segments[i] = this.$$controller.getModel('BaseStaticModel', this.$$rawdata.flights.search.results.groupsData.segments[i]);
 
@@ -869,9 +937,9 @@ define(
 								this.segments[i].flightTime *= 60;
 								this.segments[i].flightTime = this.$$controller.getModel('Common/Duration', this.segments[i].flightTime);
 
-									// Aircraft
+								// Aircraft
 								this.segments[i].aircraftType = this.aircrafts[this.segments[i].aircraftType];
-
+								
 								// Companies
 								this.segments[i].marketingCompany = this.airlines[this.segments[i].marketingCompany];
 								this.segments[i].operatingCompany = this.airlines[this.segments[i].operatingCompany];
@@ -898,6 +966,39 @@ define(
 								);
 
 								setSegmentsGuide = false;
+
+								if (
+									this.segments[i].stopPoints != null &&
+									this.segments[i].stopPoints.length > 0
+								) {
+									// This is needed for not to link models to raw data
+									this.segments[i].stopPoints = helpers.cloneObject(this.segments[i].stopPoints);
+
+									for (var j = 0; j < this.segments[i].stopPoints.length; j++) {
+										this.segments[i].stopPoints[j].airport = this.$$controller.getModel(
+											'Flights/Common/Geo',
+											{
+												data: {
+													IATA: this.segments[i].stopPoints[j].airportCode
+												},
+												guide: null
+											}
+										);
+
+										this.segments[i].stopPoints[j].depDateTime = this.$$controller.getModel('Common/Date', this.segments[i].stopPoints[j].depDateTime);
+										this.segments[i].stopPoints[j].arrDateTime = this.$$controller.getModel('Common/Date', this.segments[i].stopPoints[j].arrDateTime);
+
+										this.segments[i].stopPoints[j].duration = this.$$controller.getModel(
+											'Common/Duration',
+											this.segments[i].stopPoints[j].depDateTime.getTimestamp() - this.segments[i].stopPoints[j].arrDateTime.getTimestamp()
+										);
+
+										this.segments[i].stopPoints[j].passengersLanding = !!this.segments[i].stopPoints[j].passengersLanding;
+									}
+								}
+								else {
+									this.segments[i].stopPoints = [];
+								}
 							}
 						}
 
@@ -927,8 +1028,10 @@ define(
 									'Flights/SearchResults/Flight',
 									{
 										id: source.flights[j].id,
+										rating: source.flights[j].rating,
 										price: this.prices[source.flights[j].price],
-										segments: segsarr
+										segments: segsarr,
+										createOrderLink: source.flights[j].createOrderLink
 									}
 								);
 
@@ -944,7 +1047,9 @@ define(
 
 						// Constructing validating carriers by rating
 						this.validatingAirlinesByRating = Object.keys(this.validatingAirlines)
-							.map(function (key) {return self.airlines[key]})
+							.map(function (key) {
+								return self.airlines[key]
+							})
 							.sort(function (a, b) {
 								return parseFloat(b.rating) - parseFloat(a.rating);
 							});
@@ -954,7 +1059,7 @@ define(
 						// that relies on maximum/minimum values for all flights
 						for (var i in this.flights) {
 							if (this.flights.hasOwnProperty(i)) {
-								tmp = this.flights[i].getTotalPrice().normalizedAmount() + '-' + this.flights[i].getTotalPrice().currency() + '-' + this.flights[i].getValidatingCompany();
+								tmp = this.flightsGetGrouppingKey(this.flights[i]);//this.flights[i].getTotalPrice().normalizedAmount() + '-' + this.flights[i].getTotalPrice().currency() + '-' + this.flights[i].getValidatingCompany();
 
 								if (!tmpGroups[tmp]) {
 									tmpGroups[tmp] = [];
@@ -966,7 +1071,10 @@ define(
 
 						for (var i in tmpGroups) {
 							if (tmpGroups.hasOwnProperty(i)) {
-								tmp = this.$$controller.getModel('Flights/SearchResults/Group', {flights: tmpGroups[i], resultsController: this});
+								tmp = this.$$controller.getModel('Flights/SearchResults/Group', {
+									flights: tmpGroups[i],
+									resultsController: this
+								});
 
 								// Setting group "conjunction table"
 								tmp.buildCouplingTable(this.flights);
@@ -974,14 +1082,20 @@ define(
 								this.groups.push(tmp);
 							}
 						}
-						if (this.options.showBlocks.useFlightCompareTable) {
-							this.flightsCompareTableDirect(this.$$controller.getModel('Flights/SearchResults/CompareTable', {groups: this.groups(), direct:true, controller:this}));
-							this.flightsCompareTableTransfer(this.$$controller.getModel('Flights/SearchResults/CompareTable', {groups: this.groups(), direct:false, controller:this}));
-						}
+
+						this.buildCompareTables();
 
 						this.buildPFs();
 
-						this.sort(this.options.defaultSort);
+						// We force sorting whether sort has changed or not
+						newsort = this.possibleSorts.indexOf(this.options.defaultSort) >= 0 ? this.options.defaultSort : this.possibleSorts[0];
+
+						if (sort != newsort) {
+							this.sort(newsort);
+						}
+						else {
+							this.sort.valueHasMutated();
+						}
 
 						this.setShowcase();
 					}
@@ -999,8 +1113,8 @@ define(
 						// We haven't shown expiration warning popup and the time has come
 						if (
 							self.expirationPopupWarning.length() < self.expirationPopupExpired.length() &&
-								self.expirationPopupWarning.length() >= 0
-							) {
+							self.expirationPopupWarning.length() >= 0
+						) {
 							self.expirationPopupWarning.decrement();
 						}
 
@@ -1016,15 +1130,19 @@ define(
 				}
 			}
 
-			this.resultsLoaded(true);
+			this.resultsLoaded(displayResults);
+		};
+
+		FlightsSearchResultsController.prototype.flightsGetGrouppingKey = function (flight) {
+			return flight.getTotalPrice().normalizedAmount() + '-' + flight.getTotalPrice().currency() + '-' + flight.getValidatingCompany().IATA;
 		};
 
 		FlightsSearchResultsController.prototype.buildModels = function () {
 			var self = this;
 
-			function searchError (message, systemData) {
+			function searchError(message, systemData) {
 				if (typeof systemData != 'undefined' && systemData[0] !== 0) {
-					self.$$controller.error('SEARCH ERROR: '+message, systemData);
+					self.$$controller.error('SEARCH ERROR: ' + message, systemData);
 				}
 
 				if (typeof systemData == 'undefined' || systemData[0] !== 0) {
@@ -1038,85 +1156,106 @@ define(
 			}
 			// We were performin search - process response and load results
 			else {
-				this.processSearchInfo();
-
-				this.id = this.$$rawdata.flights.search.results.id;
-
-				// Processing error
-				if (this.$$rawdata.flights.search.results.info && this.$$rawdata.flights.search.results.info.errorCode) {
-					this.error(this.$$rawdata.flights.search.results.info.errorCode);
-					this.resultsLoaded(true);
+				if (this.$$rawdata.system && this.$$rawdata.system.error) {
+					searchError('systemError', this.$$rawdata.system.error);
 				}
-				// Loading results
 				else {
-					this.$$controller.navigateReplace(
-						'results/' + this.$$rawdata.flights.search.results.id + '/' + this.$$componentParameters.route.join(''),
-						false,
-						'FlightsResults'
-					);
+					this.processSearchInfo();
 
-					this.mode = 'id';
+					this.id = this.$$rawdata.flights.search.results.id;
 
-					// Loading search results
-					this.$$controller.loadData(
-						this.dataURL(),
-						this.dataPOSTParameters(),
-						function (text, request) {
-							var response;
+					// Processing error
+					if (this.$$rawdata.flights.search.results.info && this.$$rawdata.flights.search.results.info.errorCode) {
+						this.error(this.$$rawdata.flights.search.results.info.errorCode);
+						this.resultsLoaded(true);
+					}
+					// Loading results
+					else {
+						//return
+						this.$$controller.navigateReplace(
+							'results/' + this.$$rawdata.flights.search.results.id + '/' + this.$$componentParameters.route.join(''),
+							false,
+							'FlightsResults'
+						);
 
-							try {
-								response = JSON.parse(text);
+						this.mode = 'id';
 
-								// Checking for errors
-								if (!response.system || !response.system.error) {
-									if (!response.flights.search.results.info.errorCode) {
+						// Loading search results
+						this.$$controller.loadData(
+							this.dataURL(),
+							this.dataPOSTParameters(),
+							function (text, request) {
+								var response;
+
+								try {
+									response = JSON.parse(text);
+
+									// Checking for errors
+									if (!response.system || !response.system.error) {
 										self.$$rawdata = response;
 
 										self.processSearchResults();
+										//if (!response.flights.search.results.info.errorCode) {
+										//}
+										//else {
+										//	searchError(response.flights.search.results.info.errorCode);
+										//}
 									}
 									else {
-
-										searchError(response.flights.search.results.info.errorCode);
+										searchError('systemError', response.system.error);
 									}
 								}
-								else {
-									searchError('systemError', response.system.error);
+								catch (e) {
+									console.error(e);
+									searchError('brokenJSON', text);
 								}
-							}
-							catch (e) {
-								console.error(e);
-//								searchError('brokenJSON', text);
-							}
-						},
-						function (request) {
+							},
+							function (request) {
 
-						}
-					)
+							}
+						)
+					}
 				}
+
 			}
+		};
+
+		FlightsSearchResultsController.prototype.getPFsOrder = function () {
+			if (this.options.postFilters && this.options.postFilters.postFiltersSort && this.options.postFilters.postFiltersSort instanceof Array) {
+				return this.options.postFilters.postFiltersSort;
+			}
+
+			return this.postfiltersData.order;
 		};
 
 		FlightsSearchResultsController.prototype.buildPFs = function () {
 			var self = this,
 				filtersOrderObject = {},
+				filtersObject = {},
+				pfsOrder = this.getPFsOrder(),
 				tmp;
+
+			// Cleaning initial state
+			this.postFilters([]);
+			this.visiblePostFilters([]);
+			this.postFiltersObject({});
 
 			// Creating filters
 			// Preparing filters array - flipping
-			for (var key in this.postfiltersData.order ) {
-				if (this.postfiltersData.order.hasOwnProperty(key)) {
-					filtersOrderObject[this.postfiltersData.order[key]] = key;
+			for (var key in pfsOrder) {
+				if (pfsOrder.hasOwnProperty(key)) {
+					filtersOrderObject[pfsOrder[key]] = parseInt(key);
 				}
 			}
 
 			// Creating
-			for (var i = 0; i < this.postfiltersData.order.length; i++) {
-				if (this.postfiltersData.configs[this.postfiltersData.order[i]].isLegged) {
+			for (var i = 0; i < pfsOrder.length; i++) {
+				if (this.postfiltersData.configs[pfsOrder[i]].isLegged) {
 					var pfConfig,
 						pfGroup = [];
 
 					for (var j = 0; j < this.searchInfo().segments.length; j++) {
-						pfConfig = helpers.cloneObject(this.postfiltersData.configs[this.postfiltersData.order[i]]);
+						pfConfig = helpers.cloneObject(this.postfiltersData.configs[pfsOrder[i]]);
 
 						pfConfig.legNumber = j;
 
@@ -1125,7 +1264,9 @@ define(
 							{
 								config: pfConfig,
 								items: this.flights,
-								onChange: function () {self.PFChanged.apply(self, arguments);}
+								onChange: function () {
+									self.PFChanged.apply(self, arguments);
+								}
 							}
 						);
 
@@ -1144,7 +1285,7 @@ define(
 					if (pfGroup.length) {
 						this.visiblePostFilters.push(
 							this.$$controller.getModel(
-								'Flights/SearchResults/'+this.postfiltersData.configs[this.postfiltersData.order[i]].type+'PFGroup',
+								'Flights/SearchResults/' + this.postfiltersData.configs[pfsOrder[i]].type + 'PFGroup',
 								{
 									filters: pfGroup,
 									resultsController: this
@@ -1155,11 +1296,13 @@ define(
 				}
 				else {
 					tmp = this.$$controller.getModel(
-						'Common/PostFilter/' + this.postfiltersData.configs[this.postfiltersData.order[i]].type,
+						'Common/PostFilter/' + this.postfiltersData.configs[pfsOrder[i]].type,
 						{
-							config: this.postfiltersData.configs[this.postfiltersData.order[i]],
+							config: this.postfiltersData.configs[pfsOrder[i]],
 							items: this.flights,
-							onChange: function () {self.PFChanged.apply(self, arguments);}
+							onChange: function () {
+								self.PFChanged.apply(self, arguments);
+							}
 						}
 					);
 
@@ -1208,14 +1351,47 @@ define(
 			}
 
 			// Sorting
-			this.postFilters.sort(function (a, b) {
+			this.visiblePostFilters.sort(function (a, b) {
 				return filtersOrderObject[a.config.name] - filtersOrderObject[b.config.name] || a.config.legNumber - b.config.legNumber;
 			});
+
+			// Constructing filters object
+			this.postFilters().map(function (item) {
+				if (item.config.isLegged) {
+					if (!(item.config.name in filtersObject)) {
+						filtersObject[item.config.name] = [];
+					}
+
+					filtersObject[item.config.name].push(item);
+				}
+				else {
+					filtersObject[item.config.name] = item;
+				}
+			});
+
+			this.postFiltersObject(filtersObject);
 
 			// Setting postFilters to work
 			this.usePostfilters = true;
 
 			this.PFChanged();
+		};
+
+		FlightsSearchResultsController.prototype.buildCompareTables = function () {
+			if (this.options.showBlocks.useFlightCompareTable) {
+				this.flightsCompareTableDirect(this.$$controller.getModel('Flights/SearchResults/CompareTable', {
+					groups: this.groups(),
+					direct: true,
+					controller: this,
+					transfersType: this.options.compareTableTransfersType
+				}));
+				this.flightsCompareTableTransfer(this.$$controller.getModel('Flights/SearchResults/CompareTable', {
+					groups: this.groups(),
+					direct: false,
+					controller: this,
+					transfersType: this.options.compareTableTransfersType
+				}));
+			}
 		};
 
 		FlightsSearchResultsController.prototype.buildVisibleGroups = function () {
@@ -1250,11 +1426,11 @@ define(
 				groups = this.groups(),
 				result,
 				visibleCount = 0,
-				tmp,i,j;
+				tmp, i, j;
 
 			this.PFWorking(true);
 
-			function intersectFilterResults (filterResults, skipIndex) {
+			function intersectFilterResults(filterResults, skipIndex) {
 				var result;
 
 				for (var i in filterResults) {
@@ -1280,7 +1456,7 @@ define(
 
 			for (i = 0; i < filters.length; i++) {
 				if (filters[i].hasValue()) {
-					var t =[];
+					var t = [];
 
 					for (j in this.flights) {
 						if (this.flights.hasOwnProperty(j) && filters[i].filter(this.flights[j])) {
@@ -1302,7 +1478,9 @@ define(
 					var tmp = intersectFilterResults(filterResults, i) || Object.keys(this.flights);
 
 					filters[i].recalculateOptions(
-						tmp.map(function (key) {return self.flights[key];})
+						tmp.map(function (key) {
+							return self.flights[key];
+						})
 					);
 				}
 			}
@@ -1362,11 +1540,18 @@ define(
 			if (this.options.showBlocks.useShowCase) {
 				for (var i in this.flights) {
 					if (this.flights.hasOwnProperty(i) && !this.flights[i].filteredOut()) {
-						if(!bestFlight || bestFlight.recommendRating < this.flights[i].recommendRating) {
+						if(
+							!bestFlight ||
+							bestFlight.recommendRating < this.flights[i].recommendRating ||
+							(
+								bestFlight.recommendRating == this.flights[i].recommendRating &&
+								bestFlight.getTotalPrice().normalizedAmount() > this.flights[i].getTotalPrice().normalizedAmount()
+							)
+						) {
 							bestFlight = this.flights[i];
 						}
 
-						if(!fastestFlight || fastestFlight.totalTimeEnRoute.length() > this.flights[i].totalTimeEnRoute.length()) {
+						if (!fastestFlight || fastestFlight.totalTimeEnRoute.length() > this.flights[i].totalTimeEnRoute.length()) {
 							fastestFlight = this.flights[i];
 						}
 					}
@@ -1387,13 +1572,19 @@ define(
 
 				tmp = [];
 
-				if(cheapestGroup) {
+				if (cheapestGroup) {
 					fastestInCheapest = fastestFlight.id in cheapestGroup.flightsById;
 					bestInCheapest = bestFlight.id in cheapestGroup.flightsById;
 					fastestIsBest = fastestFlight.id == bestFlight.id;
 
-					bestFlight = this.$$controller.getModel('Flights/SearchResults/Group', {flights: [bestFlight], resultsController: this});
-					fastestFlight = this.$$controller.getModel('Flights/SearchResults/Group', {flights: [fastestFlight], resultsController: this});
+					bestFlight = this.$$controller.getModel('Flights/SearchResults/Group', {
+						flights: [bestFlight],
+						resultsController: this
+					});
+					fastestFlight = this.$$controller.getModel('Flights/SearchResults/Group', {
+						flights: [fastestFlight],
+						resultsController: this
+					});
 
 					// Setting group "conjunction table"
 					bestFlight.buildCouplingTable(this.flights);
@@ -1465,7 +1656,11 @@ define(
 								this.flights[j].getValidatingCompany().IATA == this.validatingAirlinesByRating[i].IATA &&
 								(
 									showcaseBC == null ||
-									showcaseBC.recommendRating < this.flights[j].recommendRating
+									showcaseBC.recommendRating < this.flights[j].recommendRating ||
+									(
+										showcaseBC.recommendRating == this.flights[j].recommendRating &&
+										showcaseBC.getTotalPrice().normalizedAmount() > this.flights[j].getTotalPrice().normalizedAmount()
+									)
 								)
 							) {
 								showcaseBC = this.flights[j];
@@ -1474,7 +1669,10 @@ define(
 					}
 
 					if (showcaseBC) {
-						var tmp = this.$$controller.getModel('Flights/SearchResults/Group', {flights: [showcaseBC.clone()], resultsController: this});
+						var tmp = this.$$controller.getModel('Flights/SearchResults/Group', {
+							flights: [showcaseBC.clone()],
+							resultsController: this
+						});
 
 						// Setting group "conjunction table"
 						tmp.buildCouplingTable(this.flights);
@@ -1509,9 +1707,9 @@ define(
 		FlightsSearchResultsController.prototype.makeSearch = function (url, identifier, replaceURL) {
 			var self = this;
 
-			function searchError (message, systemData) {
+			function searchError(message, systemData) {
 				if (typeof systemData != 'undefined' && systemData[0] !== 0) {
-					self.$$controller.error('SEARCH ERROR: '+message, systemData);
+					self.$$controller.error('SEARCH ERROR: ' + message, systemData);
 				}
 
 				if (typeof systemData == 'undefined' || systemData[0] !== 0) {
@@ -1622,7 +1820,7 @@ define(
 		FlightsSearchResultsController.prototype.disablePFHint = function (data) {
 			this.PFHintActive(false);
 
-			Cookie.set(this.$$controller.options.cookiesPrefix + this.PFHintCookie, true, { expires: 365 });
+			Cookie.set(this.$$controller.options.cookiesPrefix + this.PFHintCookie, true, {expires: 365});
 		};
 
 		FlightsSearchResultsController.prototype.passengersSummary = function () {
@@ -1642,13 +1840,13 @@ define(
 			}
 
 			if (passTypes.length == 0) {
-				ret = this.$$controller.i18n('FlightsSearchForm','passSummary_numeral_noPassengers');
+				ret = this.$$controller.i18n('FlightsSearchForm', 'passSummary_numeral_noPassengers');
 			}
 			else if (passTypes.length == 1) {
-				ret = total + ' ' + this.$$controller.i18n('FlightsSearchForm','passSummary_numeral_' + passTypes.pop() + '_' + helpers.getNumeral(total, 'one', 'twoToFour', 'fourPlus'));
+				ret = total + ' ' + this.$$controller.i18n('FlightsSearchForm', 'passSummary_numeral_' + passTypes.pop() + '_' + helpers.getNumeral(total, 'one', 'twoToFour', 'fourPlus'));
 			}
 			else {
-				ret = total + ' ' + this.$$controller.i18n('FlightsSearchForm','passSummary_numeral_mixed_' + helpers.getNumeral(total, 'one', 'twoToFour', 'fourPlus'));
+				ret = total + ' ' + this.$$controller.i18n('FlightsSearchForm', 'passSummary_numeral_mixed_' + helpers.getNumeral(total, 'one', 'twoToFour', 'fourPlus'));
 			}
 
 			return ret;

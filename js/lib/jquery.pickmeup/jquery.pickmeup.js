@@ -53,7 +53,7 @@
 		factory(require('jquery'));
 	} else {
 		// Browser globals
-		factory(jQuery);
+		factory($);
 	}
 }(function ($) {
 
@@ -152,7 +152,7 @@
 		}
 	});
 	function currentCalendar(){
-		//@DIRTY HACK: in case of 2 calendars left one will be active, not right one
+		//DIRTY HACK: in case of 2 calendars left one will be active, not right one
 		var options = $(this).data('pickmeup-options');
 		if (options.calendars == 2) {
 			return ~~((options.calendars / 2) - 1)
@@ -399,6 +399,7 @@
 					var day = (localDate.getDay() - options.firstDay) % 7;
 					localDate.addDays(-(day + (day < 0 ? 7 : 0)));
 				})();
+
 				for (var j = 0; j < 42; ++j) {
 					day = {
 						text: localDate.getDate(),
@@ -413,7 +414,7 @@
 						day.className.push('nemo-pmu-saturday');
 					}
 					var today = new Date().setHours(0,0,0,0);
-					var from_user = options.render(new Date(localDate)) || {},
+					var from_user = options.render(new Date(localDate), current_month) || {},
 						val = localDate.valueOf(),
 						disabled = (options.min && options.min > localDate) || (options.max && options.max < localDate);
 					//collecting data for data-attributes
@@ -889,74 +890,83 @@
 					});
 				options.lastSel = false;
 			}
+
 			options.beforeShow();
+
 			if (options.show() == false) {
 				return;
 			}
+
 			var instanceWidth = pickmeup.find('.js-nemo-pmu-instance:eq(0)').width();
-			var instancesWidth = instanceWidth*options.calendars;
+			var instancesWidth = pickmeup.outerWidth();
 			var instanceCenter = instancesWidth/2 - inputWidth/2;
 			if (!options.flat) {
-				switch (options.position) {
-					case 'top':
-						top -= pickmeup.outerHeight();
-						break;
-					case 'left':
-						left -= pickmeup.outerWidth();
-						break;
-					case 'right':
-						left += this.offsetWidth;
-						break;
-					case 'bottom':
-						top += this.offsetHeight;
-						break;
+				if (typeof options.position == 'function') {
+					options.position.call($this, pickmeup, options, pos, viewport);
 				}
-				if (top + pickmeup.offsetHeight > viewport.t + viewport.h) {
-					top = pos.top - pickmeup.offsetHeight;
+				else {
+					switch (options.position) {
+						case 'top':
+							top -= pickmeup.outerHeight();
+							break;
+						case 'left':
+							left -= pickmeup.outerWidth();
+							break;
+						case 'right':
+							left += this.offsetWidth;
+							break;
+						case 'bottom':
+							top += this.offsetHeight;
+							break;
+					}
+					if (top + pickmeup.offsetHeight > viewport.t + viewport.h) {
+						top = pos.top - pickmeup.offsetHeight;
+					}
+					if (top < viewport.t) {
+						top = pos.top + this.offsetHeight + pickmeup.offsetHeight;
+					}
+					if (left + pickmeup.offsetWidth > viewport.l + viewport.w) {
+						left = pos.left - pickmeup.offsetWidth;
+					}
+					if (left < viewport.l) {
+						left = pos.left + this.offsetWidth
+					}
+					if(instancesWidth + left - instanceCenter >= viewport.w || instanceCenter > left){
+						instanceCenter = 0;
+					}
+					if (instancesWidth < viewport.w && instancesWidth+left-instanceCenter >= viewport.w + 20) {
+						pickmeup.removeClass('nemo-pmu-thinView');
+						pickmeup.css({
+							display: 'inline-block',
+							top: top + 'px',
+							right:20 + 'px'
+						});
+					}else if(instancesWidth >= viewport.w && instanceWidth+left-instanceCenter <= viewport.w){
+						pickmeup.addClass('nemo-pmu-thinView');
+						pickmeup.css({
+							display: 'inline-block',
+							top: top + 'px',
+							right:'auto',
+							left:left
+						});
+					}else if(instancesWidth >= viewport.w && instanceWidth+left-instanceCenter >= viewport.w){
+						pickmeup.addClass('nemo-pmu-thinView');
+						pickmeup.css({
+							display: 'inline-block',
+							top: top + 'px',
+							right:0
+						});
+					}else{
+						pickmeup.removeClass('nemo-pmu-thinView');
+						pickmeup.css({
+							display: 'inline-block',
+							top: top + 'px',
+							left: left-instanceCenter  + 'px',
+							right:'auto'
+						});
+					}
 				}
-				if (top < viewport.t) {
-					top = pos.top + this.offsetHeight + pickmeup.offsetHeight;
-				}
-				if (left + pickmeup.offsetWidth > viewport.l + viewport.w) {
-					left = pos.left - pickmeup.offsetWidth;
-				}
-				if (left < viewport.l) {
-					left = pos.left + this.offsetWidth
-				}
-				if(instancesWidth + left + instanceCenter >= viewport.w || instanceCenter > left){
-					instanceCenter = 0;
-				}
-				if (instancesWidth < viewport.w && instancesWidth+left-instanceCenter >= viewport.w + 20) {
-					pickmeup.removeClass('nemo-pmu-thinView');
-					pickmeup.css({
-						display: 'inline-block',
-						top: top + 'px',
-						right:20 + 'px'
-					});
-				}else if(instancesWidth >= viewport.w && instanceWidth+left-instanceCenter <= viewport.w){
-					pickmeup.addClass('nemo-pmu-thinView');
-					pickmeup.css({
-						display: 'inline-block',
-						top: top + 'px',
-						right:'auto',
-						left:left
-					});
-				}else if(instancesWidth >= viewport.w && instanceWidth+left-instanceCenter >= viewport.w){
-					pickmeup.addClass('nemo-pmu-thinView');
-					pickmeup.css({
-						display: 'inline-block',
-						top: top + 'px',
-						right:0
-					});
-				}else{
-					pickmeup.removeClass('nemo-pmu-thinView');
-					pickmeup.css({
-						display: 'inline-block',
-						top: top + 'px',
-						left: left-instanceCenter  + 'px',
-						right:'auto'
-					});
-				}
+
 				$(document)
 					.on(
 					'mousedown' + options.events_namespace + 'touch' + options.events_namespace + 'blur' + options.events_namespace,
@@ -1220,7 +1230,7 @@
 			}else{
 				options = $.extend({}, $.pickmeup, passedArguments);
 			}
-			jQuery(this).pickmeup('destroy');
+			$(this).pickmeup('destroy');
 
 			var i,
 				option;

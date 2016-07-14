@@ -4,6 +4,7 @@ define(
 	function (ko, helpers, BaseModel) {
 		function CompareTable (initialData) {
 			this.controller = initialData.controller;
+
 			var tempFlightGroups = initialData.groups,
 				tmpct = {},
 				tmpctDirect = {},
@@ -35,8 +36,7 @@ define(
 				}
 			}
 
-
-			for(var i in tmpctTransfer ) {
+			for(var i in tmpctTransfer) {
 				if (tmpctTransfer.hasOwnProperty(i)){
 					if (!isNaN(parseFloat(i)) && isFinite(i)){
 						tempGroupsArrTransfer[i] = tmpctTransfer[i];
@@ -46,7 +46,7 @@ define(
 				}
 			}
 
-			for(var i in tmpctDirect ) {
+			for(var i in tmpctDirect) {
 				if (tmpctDirect.hasOwnProperty(i)){
 					if (!isNaN(parseFloat(i)) && isFinite(i)){
 						tempGroupsArrDirect[i] = tmpctDirect[i];
@@ -55,6 +55,7 @@ define(
 					}
 				}
 			}
+
 
 			for (var i in tempGroupsArrTransfer){
 				tempGroupsArrTransfer[i].groupsFilteredOut = ko.computed(function() {
@@ -69,8 +70,8 @@ define(
 				}, tempGroupsArrTransfer[i]);
 			}
 
-			for (var i in tmpctDirect){
-				tmpctDirect[i].groupsFilteredOut = ko.computed(function() {
+			for (var i in tempGroupsArrDirect){
+				tempGroupsArrDirect[i].groupsFilteredOut = ko.computed(function() {
 					for (var j = 0; j < this.groups.length; j++) {
 						if (this.groups[j].filteredOut() == false) {
 							return false;
@@ -79,8 +80,10 @@ define(
 							return true;
 						}
 					}
-				}, tmpctDirect[i]);
+				}, tempGroupsArrDirect[i]);
 			}
+
+
 
 			if(tempGroupsArrTransfer.length>0){
 				tmpLongestTransfer = tempGroupsArrTransfer.sort(function(a, b) {
@@ -97,6 +100,13 @@ define(
 			}else{
 				tmpLongestDirect = 0;
 			}
+
+			tempGroupsArrTransfer.sort(function(a,b){
+				return a.groups[0].getTotalPrice().amount() - b.groups[0].getTotalPrice().amount()
+			});
+			tempGroupsArrDirect.sort(function(a,b){
+				return a.groups[0].getTotalPrice().amount() - b.groups[0].getTotalPrice().amount()
+			});
 
 
 			if(tmpLongestDirect >= tmpLongestTransfer){
@@ -123,7 +133,7 @@ define(
 			this.allGroupsVisible = ko.observable(true);
 
 			this.indexHelper = ko.computed(function(){ //TODO refactor flag counting for ShowMore
-				 return [this.paginationShownPages() + this.paginationStep()-3,this.paginationShownPages() + this.paginationStep()-2, this.paginationShownPages() + this.paginationStep()-1]
+				return [this.paginationShownPages() + this.paginationStep()-3,this.paginationShownPages() + this.paginationStep()-2, this.paginationShownPages() + this.paginationStep()-1]
 			}, this);
 
 			this.paginationHasNext = ko.computed(function(){
@@ -165,12 +175,17 @@ define(
 
 
 			BaseModel.apply(this, arguments);
+
+			if (this.transfersTypes.indexOf(this.transfersType) < 0) {
+				this.transfersType = this.transfersTypes[0];
+			}
 		}
 
 		// Extending from dictionaryModel
 		helpers.extendModel(CompareTable, [BaseModel]);
 
 		CompareTable.prototype.columnThreshold = 3;
+		CompareTable.prototype.transfersTypes = ['sum', 'min', 'max'];
 
 		CompareTable.prototype.paginationNext = function(){
 			if(this.paginationHasNext()){
@@ -205,5 +220,44 @@ define(
 				}
 			}
 		};
+
+		CompareTable.prototype.getTransfersCountForFlight = function (flight) {
+			var ret = 0,
+				transfers = flight.transfers.map(function (i) {return i.length});
+
+			switch (this.transfersType) {
+				case 'sum':
+					transfers.map(function (i) {ret += i;});
+					break;
+				case 'max':
+					ret = Math.max.apply(Math, transfers);
+					break;
+				case 'min':
+					transfers = transfers
+						.reduce(function(p, c) {
+								if (p.indexOf(c) < 0) p.push(c);
+								return p;
+							}, [])
+						.sort(function (a, b) {return a - b});
+
+					if (transfers[0] == 0 && transfers.length > 1) {
+						ret = transfers[1];
+					}
+					else {
+						ret = transfers[0];
+					}
+
+					break;
+			}
+
+			return ret;
+		};
+
+		CompareTable.prototype.getTransfersCountForFlightFormatted = function (flight) {
+			var ret = this.getTransfersCountForFlight(flight);
+
+			return ret + (flight.transfersCount > ret ? '+' : '');
+		};
+
 		return CompareTable;
 	});
