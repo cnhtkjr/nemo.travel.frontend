@@ -92,7 +92,7 @@
 					staticInfoURL: 'http://conchita.mlsd.ru',
 					root: '/',
 //						    verbose: true,
-					i18nLanguage: 'ua',
+					i18nLanguage: 'ru',
 					postParameters: {},
 
 					// Passing additional parametes to components

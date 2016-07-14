@@ -28,10 +28,6 @@
 		}
 	}
 
-	&__warning {
-		max-width: 600px;
-	}
-
 	&__globalError {
 		max-width: 1540px;
 		margin: 40px auto;
@@ -332,8 +328,23 @@
 
 			&__loadingDummy {
 				text-align: center;
-				padding: 40px;
+				padding: 135px 40px 40px;
 				position: relative;
+
+				&:before {
+					content: "";
+					width: 40px;
+					height: 40px;
+					left: 50%;
+					top: 70px;
+
+					margin: -20px 0 0 -20px;
+
+					position: absolute;
+					background: url("images/fsf-sprite.svg") no-repeat scroll -40px 5px;
+					background-size: 200%;
+					animation: nemo-flights-form__searchingInfoPopup__headerAnimation 1s infinite;
+				}
 
 				&__title {
 					font-size: 15px;
@@ -410,7 +421,7 @@
 					line-height: 30px;
 
 					&_count {
-						flex-grow: 1;
+						flex-grow: 0;
 						white-space: nowrap;
 						overflow: hidden;
 						text-overflow: ellipsis;
@@ -592,16 +603,6 @@
 					font-size: 13px;
 					color: $nemo-color-text-secondary;
 				}
-			}
-		}
-	}
-
-	&__flightsWarnings {
-		&__item {
-			margin-bottom: 10px;
-
-			&:last-child {
-				margin-bottom: 0;
 			}
 		}
 	}

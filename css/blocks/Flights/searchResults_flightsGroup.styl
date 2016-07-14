@@ -16,7 +16,6 @@
 			top: 50%;
 			margin: -40px 0 0 5px;
 			direction: rtl;
-			display: none;
 
 			&__item {
 				width: 70px;
@@ -61,7 +60,7 @@
 			text-overflow: ellipsis;
 
 			&_showcase {
-				//visibility: hidden;
+				visibility: hidden;
 			}
 		}
 
@@ -300,7 +299,6 @@
 						overflow: hidden;
 						text-overflow: ellipsis;
 						padding-right: 10px;
-						display: inline-block;
 
 						&_dates {
 							display: none;
@@ -308,11 +306,6 @@
 
 						&__dayOfWeek {
 							color: $nemo-color-text-secondary;
-						}
-
-						&__charter {
-							border-left: 1px solid $nemo-color-notification_error_text;
-							padding-left: 5px;
 						}
 					}
 
@@ -652,59 +645,29 @@
 			margin-top: -12.5px;
 		}
 
-		&_warning {
-			overflow: visible;
-
-			&:after {
-				content: '!';
-				position: absolute;
-				background: $nemo-color-notification_error;
-				color: $nemo-color-LightPoint;
-				font-size: 22px;
-				text-align: center;
-				font-weight: bold;
-				top: 50%;
-				right: -25px;
-				margin-top: -15px;
-				width: 30px;
-				height: 30px;
-				border-radius: 30px;
-				line-height: 30px;
-				transition: all .2s;
-			}
-
-			&:hover:after {
-				background: lighten($nemo-color-notification_error, 20%);
-			}
-		}
-
 		&_bookingCheck {
-			padding-left: 10px;
-			padding-right: 50px;
-			box-shadow: none;
+			padding-left: 20px;
+			padding-right: 20px;
+
 			cursor: auto;
-			position: relative;
-			text-align: right;
-			transition: none;
 
 			&, &:hover, &:active, &:focus, &:hover:focus {
-				//background: #7F7F7F;
-				background: transparent;// url('images/loader.svg') right center no-repeat;
+				background: #7F7F7F;
 			}
 
 			&:before {
 				content: '';
 				position: absolute;
-				top: 50%;
-				left: auto;
-				right: 0;
-				bottom: auto;
-				height: 40px;
-				width: 40px;
-				margin: 0;
-				transform: translate(0, -50%);
-				background: url('images/loader.svg') right center no-repeat;
-				background-size: contain;
+				z-index: 0;
+				top: 0;
+				left: 0;
+				bottom: 0;
+				height: auto;
+				width: auto;
+				background: $nemo-color-main;
+				animation: nemo-ui-button__progressAnimation 20s 1 forwards;
+				animation-timing-function: cubic-bezier(.55,.06,.64,1);
+				border-radius: 4px 0 0 4px;
 			}
 		}
 
@@ -721,8 +684,6 @@
 			display: none;
 			position: relative;
 			z-index: 1;
-			color: $nemo-color-text-main;
-			font-size: 13px;
 		}
 	}
 
@@ -731,23 +692,20 @@
 		overflow: visible;
 	}
 
-	&__pricingDebugLink {
-		padding: 10px;
-		text-align: right;
-		display: block;
-	}
+	//&_common {
+	//	margin-top: 20px;
+	//
+	//	&:first-child {
+	//		margin-top: 0;
+	//	}
+	//}
+
+	//&_cheapest &__header__title,
+	//&_cheapest &__header__additional {
+	//background: #B23E13;
+	//}
 
 	&_bestCompanies {
 		margin-bottom: 20px;
-	}
-
-	&__couplingTablePopupHeader {
-		&_light {
-			color: #FFF;
-
-			.ui-dialog-titlebar-close {
-				background-image: url('images/ui/popup-close_light.svg');
-			}
-		}
 	}
 }

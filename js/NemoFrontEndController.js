@@ -11,29 +11,24 @@ define (
 
 			this.routes = [
 				// Form with optional data from existing search
-				{re: /^(?:search\/(\d+)(?:\/?.*)?)?$/, handler: 'Flights/SearchForm/Controller'},
+				{re: /^(?:search\/(\d+)(?:\/.*)?)?$/, handler: 'Flights/SearchForm/Controller'},
 
 				// Form with initialization by URL:
 				// /IEVPEW20150718PEWMOW20150710ADT3INS1CLD2-direct-vicinityDates-class=Business-GO
-				// /IEVPEWd1PEWMOWd10ADT3INS1CLD2-direct-vicinityDates-class=Business-GO
 				// IEV, PEW - IATAs with city priority, 20150718 - YYYY-MM-DD date
-				// d1 & d10 in second URL - relative dates
 				// ADT 3 INS 1 CLD 2 - Passenger types with corresponding counts
 				// direct - direct flights flag
 				// vicinityDates - vicinity dates flag
 				// class=Business - class definition
 				// GO - immediate search flag
-				{re: /^search\/((?:[A-ZА-Я]{6}(?:\d{8}|d\d{1,2}))+)((?:[A-Z]{3}\d+)+)?((?:-[a-zA-Z=\d]+)+)?(?:\/?\?.*)?$/, handler: 'Flights/SearchForm/Controller'},
-
-				{re: /^scheduleSearch(?:\/(\d+)(?:\/?.*)?)?$/, handler: 'Flights/ScheduleSearch/Controller'},
-				{re: /^scheduleSearch\/((?:[A-ZА-Я]{6}\d{8})+)((?:[A-Z]{3}\d+)+)?((?:-[a-zA-Z=\d\+]+)+)?(?:\/?\?.*)?$/, handler: 'Flights/ScheduleSearch/Controller'},
+				{re: /^search\/((?:[A-Z]{6}\d{8})+)((?:[A-Z]{3}\d+)+)?((?:-[a-zA-Z=\d]+)+)?$/, handler: 'Flights/SearchForm/Controller'},
 
 				{re: /^results\/(\d+)(\/.*)?$/, handler: 'Flights/SearchResults/Controller'},
 
 				// Search by URL params
 				// /cLONcPAR2015081920150923ADT1SRC1YTH1CLD1INF1INS1-class=Business-direct-vicinityDates=3 - RT, note 2 dates together (16 numbers)
 				// /cIEVaPEW20150731aPEWcIEV20150829cIEVaQRV20150916ADT3CLD2INS1-class=Business-direct - CR, 3 segments
-				{re: /^results\/((?:[ac][A-ZА-Я]{3}[ac][A-ZА-Я]{3}\d{8,16})+)((?:[A-Z]{3}[1-9])+)((?:-[a-zA-Z=\d\+]+)+)$/, handler: 'Flights/SearchResults/Controller'},
+				{re: /^results\/((?:[ac][A-Z]{3}[ac][A-Z]{3}\d{8,16})+)((?:[A-Z]{3}[1-9])+)((?:-[a-zA-Z=\d]+)+)$/, handler: 'Flights/SearchResults/Controller'},
 
 				{re: /^order\/(\d+)$/, handler: 'Flights/Checkout/Controller'},
                 {re: /^hotels$/, handler: 'Hotels/SearchForm/Controller'}
@@ -86,15 +81,15 @@ define (
 					}
 				},
 				getFragment: function() {
-					var path = ('/' + this.clearSlashes(decodeURI(location.pathname + location.search))/*.replace(/\?(.*)$/, '')*/ + '/'),
+					var controllerSourceURL = ('/'+this.clearSlashes(decodeURI(location.pathname + location.search)).replace(/\?(.*)$/, '')+'/'),
 						fragment;
 
-					if (path == '//') {
-						path = '/';
+					if (controllerSourceURL == '//') {
+						controllerSourceURL = '/';
 					}
 
-					if (self.options.root == '/' || path.indexOf(self.options.root) === 0) {
-						fragment = self.options.root != '/' ? path.replace(self.options.root, '') : path;
+					if (self.options.root == '/' || controllerSourceURL.indexOf(self.options.root) === 0) {
+						fragment = self.options.root != '/' ? controllerSourceURL.replace(self.options.root, '') : controllerSourceURL;
 						return this.clearSlashes(fragment);
 					}
 
@@ -108,7 +103,6 @@ define (
 
 					for(var i = 0; i < self.routes.length; i++) {
 						var match = fragment.match(self.routes[i].re);
-
 						if(match) {
 							match.shift();
 							return [self.routes[i].handler, match];
@@ -162,8 +156,7 @@ define (
 				},
 				user: {
 					id: ko.observable(0),
-					status: ko.observable('guest'),
-					isB2B: ko.observable('false')
+					status: ko.observable('guest')
 				}
 			};
 
@@ -182,12 +175,11 @@ define (
 			this.loadI18n(['common', 'pageTitles'], function () {
 				require (
 					[
-						/*this.options.controllerSourceURL + */
-						'js/vm/BaseDynamicModel',
-						'js/vm/BaseStaticModel',
-						'js/vm/BaseI18nizedModel',
-						'js/vm/BaseControllerModel',
-						'js/bindings/common',
+						/*this.options.controllerSourceURL + */'js/vm/BaseDynamicModel',
+						/*this.options.controllerSourceURL + */'js/vm/BaseStaticModel',
+						/*this.options.controllerSourceURL + */'js/vm/BaseI18nizedModel',
+						/*this.options.controllerSourceURL + */'js/vm/BaseControllerModel',
+						/*this.options.controllerSourceURL + */'js/bindings/common',
 						'domReady'
 					],
 					function (BaseDynamicModel, BaseStaticModel, BaseI18nizedModel, BaseControllerModel) {
@@ -313,14 +305,14 @@ define (
 				requestsCompleted = 0,
 				loadArray = [];
 
-			errorCallback = errorCallback || function () {};
-
 			function checkReadiness () {
 				if (segmentsLoaded == loadArray.length) {
 					callback();
 				}
 				else if (requestsCompleted == loadArray.length) {
-					errorCallback();
+					if (errorCallback != undefined) {
+						errorCallback();
+					}
 				}
 			}
 
@@ -383,7 +375,7 @@ define (
 		 * @returns {*}
 		 */
 		NemoFrontEndController.prototype.loadData = function (url, additionalParams, callback, errorCallback) {
-			return this.makeRequest(this.options.dataURL + url /*FIXME*/ + ((url.indexOf('?') < 0) ? '?' : '&') + 'user_language_get_change=' + this.options.i18nLanguage /*ENDFIXME*/, additionalParams, callback, errorCallback);
+			return this.makeRequest(this.options.dataURL + url /*FIXME*/ + '?user_language_get_change=' + this.options.i18nLanguage /*ENDFIXME*/, additionalParams, callback, errorCallback);
 		};
 
 		/**
@@ -402,20 +394,20 @@ define (
 
 			// We use vanilla js because we don't know which of the third-party libraries are present on page
 			// TODO - make code more simple
-			if ( typeof XDomainRequest != "undefined") {
+			if ( typeof XDomainRequest != "undefined" && url.indexOf(window.location.hostname) <= 0) {
 				//This pitiful parody on a normal request is written solely for IE9. Kill it with fire when support will no longer be needed
 				var request = new XDomainRequest(),
-					POSTParams = '';
+				POSTParams = '';
 
 				if (typeof additionalParams == 'object' && additionalParams) {
 					POSTParams += (POSTParams ? '&' : '') + this.processPOSTParameters(additionalParams);
 				}
-
 				if (POSTParams) {
-					POSTParams = '?' + POSTParams;
+					request.open('GET', url+'&'+POSTParams);
+				} else {
+					request.open('GET', url);
 				}
 
-				request.open('GET', url + POSTParams);
 				request.onload = function(){
 					if(callback){
 						self.processServerData(request.responseText);
@@ -433,10 +425,15 @@ define (
 					request.send();
 				}, 0);
 				return request
-			}
-			else {
+			}else{
 				var request = new XMLHttpRequest(),
 					POSTParams = '';
+
+				try {
+					// A wildcard '*' cannot be used in the 'Access-Control-Allow-Origin' header when the credentials flag is true.
+					request.withCredentials = this.options.CORSWithCredentials;
+				} catch (e) {
+				}
 
 				if (typeof this.options.postParameters == 'object' && this.options.postParameters) {
 					POSTParams += this.processPOSTParameters(this.options.postParameters);
@@ -445,16 +442,7 @@ define (
 					POSTParams += (POSTParams ? '&' : '') + this.processPOSTParameters(additionalParams);
 				}
 
-				// A wildcard '*' cannot be used in the 'Access-Control-Allow-Origin' header when the credentials flag is true.
-				try {
-					request.withCredentials = this.options.CORSWithCredentials;
-					request.open(POSTParams ? 'POST' : 'GET', url, true);
-				}
-				catch(e){
-					console.log('Ajax call threw this:'+e);
-					request.open(POSTParams ? 'POST' : 'GET', url, true);
-					request.withCredentials = this.options.CORSWithCredentials;
-				}
+				request.open(POSTParams ? 'POST' : 'GET', url, true);
 
 				if (POSTParams) {
 					if(request.setRequestHeader) {
@@ -489,7 +477,6 @@ define (
 				if (data && data.system && data.system.info && data.system.info.user) {
 					this.viewModel.user.id(data.system.info.user.userID);
 					this.viewModel.user.status(data.system.info.user.status);
-					this.viewModel.user.isB2B(data.system.info.user.isB2B);
 
 					this.viewModel.agency.id(data.system.info.user.agencyID);
 					this.viewModel.agency.currency(data.system.info.user.settings.agencyCurrency);
@@ -516,7 +503,7 @@ define (
 			this.log('Detected component', name, callback);
 
 			callback({
-				viewModel: { require: /*self.options.controllerSourceURL + */'js/vm/' + name/* + '.js'*/ },
+				viewModel: { require: self.options.controllerSourceURL + '/js/vm/' + name + '.js' },
 				template: { require: 'text!' + self.options.templateSourceURL + template + '.html' }
 			});
 		};

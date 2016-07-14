@@ -188,7 +188,7 @@ define(
                     dateValue.dateObject().setHours(0, 0, 0, 0);
 
                     return dateValue.dateObject().getTime();
-			}
+                }
 
                 return null;
             },

@@ -1,4 +1,5 @@
 {
-    "popup_closeText": "Закрити",
-    "nemoApp__globalError__noRoute": "Невідомий URL."
+	"popup_closeText" : "Закрыть",
+
+	"nemoApp__globalError__noRoute": "Неизвестный URL."
 }
